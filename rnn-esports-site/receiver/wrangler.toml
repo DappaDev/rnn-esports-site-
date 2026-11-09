@@ -1,0 +1,13 @@
+# Optional: only needed if you deploy from a terminal with `npx wrangler deploy`.
+# The no-terminal setup in receiver/README.md uses the Cloudflare dashboard instead.
+name = "rnn-receiver"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rnn-league"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Set the export key as a secret, never in this file:
+#   npx wrangler secret put EXPORT_KEY
