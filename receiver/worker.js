@@ -245,6 +245,7 @@ const FAN_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS motw_votes (matchup TEXT, voter TEXT, ip TEXT, side TEXT, at TEXT, PRIMARY KEY (matchup, voter))`,
   `CREATE TABLE IF NOT EXISTS talk (id INTEGER PRIMARY KEY AUTOINCREMENT, author_id TEXT, target TEXT, body TEXT, created TEXT)`,
   `CREATE TABLE IF NOT EXISTS talk_reacts (post_id INTEGER, member_id TEXT, emoji TEXT, PRIMARY KEY (post_id, member_id, emoji))`,
+  `CREATE TABLE IF NOT EXISTS signups (member_id TEXT PRIMARY KEY, team TEXT, coach TEXT, console TEXT, gamer_id TEXT, contact TEXT, exp TEXT, days TEXT, note TEXT, status TEXT, created TEXT, updated TEXT)`,
   `CREATE TABLE IF NOT EXISTS highlights (id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT, vid TEXT, title TEXT, submitted_by TEXT, status TEXT, created TEXT, reviewed_by TEXT)`,
 ];
 
@@ -331,7 +332,7 @@ async function handleAuth(request, env, url, segs, ctx) {
   if (segs[2] === "login") {
     const state = randomToken(16);
     await db.prepare(`DELETE FROM oauth_states WHERE created < ?1`).bind(Date.now() - 600000).run();
-    await db.prepare(`INSERT INTO oauth_states (state, created, purpose) VALUES (?1, ?2, ?3)`).bind(state, Date.now(), url.searchParams.get("for") === "fan" ? "fan" : null).run();
+    await db.prepare(`INSERT INTO oauth_states (state, created, purpose) VALUES (?1, ?2, ?3)`).bind(state, Date.now(), ["fan", "join"].includes(url.searchParams.get("for")) ? "fan" : null).run();
     const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, redirect_uri: redirectUri, response_type: "code", scope: env.DISCORD_GUILD_ID ? "identify guilds.members.read" : "identify", state, prompt: "none" });
     return Response.redirect("https://discord.com/oauth2/authorize?" + q, 302);
   }
@@ -439,6 +440,8 @@ async function handleMembersApi(request, env, segs, cors, ctx) {
   // Fan zone: public reads, voting without an account, trash talk for anyone signed in.
   const fanRes = await handleFanApi(request, env, route, me, ok, err);
   if (fanRes) return fanRes;
+  const signupRes = await handleSignupApi(request, env, route, me, ok, err, ctx);
+  if (signupRes) return signupRes;
 
   if (!me) return err("Please sign in.", 401);
 
@@ -616,6 +619,111 @@ async function handleMembersApi(request, env, segs, cors, ctx) {
     }
   }
   return err("Not found", 404);
+}
+
+/* =====================================================================
+ * JOIN THE LEAGUE: sign-ups for open teams (Discord sign-in required)
+ * ===================================================================== */
+const EXP_LEVELS = ["Rookie", "Pro", "All-Pro", "All-Madden"];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const publicSignup = (r) => r && ({
+  team: r.team, coach: r.coach, console: r.console, gamerId: r.gamer_id, contact: r.contact, exp: r.exp,
+  days: (r.days || "").split(",").filter(Boolean), note: r.note, status: r.status, created: r.created, updated: r.updated,
+});
+
+async function handleSignupApi(request, env, route, me, ok, err, ctx) {
+  const db = env.DB, M = request.method, t = now();
+  const isAdmin = me && me.status === "approved" && me.role === "admin";
+
+  // Draft board: which open teams are requested or filled through sign-ups. Public, no contact details.
+  if (route[0] === "signups" && route[1] === "board" && M === "GET") {
+    const r = await db.prepare(`SELECT member_id, team, coach, status FROM signups WHERE status IN ('pending','approved')`).all();
+    const mine = me ? await db.prepare(`SELECT * FROM signups WHERE member_id = ?1`).bind(me.id).first() : null;
+    return ok({
+      claims: r.results.map((x) => ({ team: x.team, coach: x.coach, status: x.status, mine: !!me && x.member_id === me.id })),
+      me: me && me.status !== "removed" ? { display: me.display || me.username, avatar: me.avatar, admin: isAdmin } : null,
+      mine: mine && mine.status !== "declined" ? publicSignup(mine) : null,
+      declined: mine && mine.status === "declined" ? mine.team : null,
+    });
+  }
+
+  if (route[0] === "signups" && (route[1] === undefined || route[1] === "mine")) {
+    if (!me) return err("Sign in with Discord to claim a team.", 401);
+    if (me.status === "removed") return err("Your access was removed by the commissioner.", 403);
+    const cur = await db.prepare(`SELECT * FROM signups WHERE member_id = ?1`).bind(me.id).first();
+
+    if (M === "POST" && route[1] === undefined) {
+      const b = await readJson(request);
+      const team = String(b.team || "").toUpperCase();
+      if (!TEAM_ABBRS.has(team)) return err("Pick an open team from the draft board first.");
+      if (cur && cur.status === "approved") return err("Your seat is already confirmed. Ask the commissioner to change it.", 409);
+      const coach = clean(b.coach, 28), gamerId = clean(b.gamerId, 32), contact = clean(b.contact, 80), note = clean(b.note, 240);
+      const consoleName = b.console === "Xbox" ? "Xbox" : "PS5";
+      const exp = EXP_LEVELS.includes(b.exp) ? b.exp : "Pro";
+      const days = Array.isArray(b.days) ? DAYS.filter((d) => b.days.includes(d)) : [];
+      if (!coach) return err("Add the coach name the broadcast should use.");
+      if (!gamerId) return err(consoleName === "Xbox" ? "Add your Xbox Gamertag so we can send game invites." : "Add your PSN ID so we can send game invites.");
+      if (!contact) return err("Add an email or phone number so the commissioner can confirm your seat.");
+      if (!days.length) return err("Pick at least one night you can play.");
+      // Team must be free: no other active sign-up and no approved member already running it.
+      const other = await db.prepare(`SELECT 1 AS x FROM signups WHERE team = ?1 AND status IN ('pending','approved') AND member_id != ?2`).bind(team, me.id).first();
+      const coached = await db.prepare(`SELECT 1 AS x FROM members WHERE status = 'approved' AND (',' || teams || ',') LIKE ?1`).bind(`%,${team},%`).first();
+      if (other || coached) return err(`The ${TEAM_NAMES[team] || team} were just taken. Pick another open team.`, 409);
+      const isNew = !cur || cur.status === "declined";
+      await db.prepare(`INSERT INTO signups VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'pending',?10,?10)
+        ON CONFLICT(member_id) DO UPDATE SET team=?2, coach=?3, console=?4, gamer_id=?5, contact=?6, exp=?7, days=?8, note=?9, status='pending', updated=?10, created=CASE WHEN signups.status='declined' THEN ?10 ELSE signups.created END`)
+        .bind(me.id, team, coach, consoleName, gamerId, contact, exp, days.join(","), note, t).run();
+      if (isNew || (cur && cur.team !== team)) {
+        ctx.waitUntil(discordPost(env.WEBHOOK_SIGNUPS, {
+          title: `${coach} wants the ${TEAM_NAMES[team] || team}`,
+          description: `New league sign-up from @${me.username} · ${consoleName} · ${exp}. Review it on the Join page.`,
+          color: 0xe8ff1a, url: siteLink(env, "join"),
+        }));
+      }
+      const row = await db.prepare(`SELECT * FROM signups WHERE member_id = ?1`).bind(me.id).first();
+      return ok({ signup: publicSignup(row) }, isNew ? 201 : 200);
+    }
+    if (M === "DELETE" && route[1] === "mine") {
+      if (cur && cur.status === "approved") return err("Your seat is confirmed. Ask the commissioner if you need to give it up.", 409);
+      await db.prepare(`DELETE FROM signups WHERE member_id = ?1`).bind(me.id).run();
+      return ok({ success: true });
+    }
+  }
+
+  // Commissioner review
+  if (route[0] === "admin" && route[1] === "signups") {
+    if (!isAdmin) return err("Only the commissioner can do that.", 403);
+    if (M === "GET") {
+      const r = await db.prepare(`SELECT s.*, m.username, m.display AS discord_name FROM signups s LEFT JOIN members m ON m.id = s.member_id
+        ORDER BY CASE s.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, s.created`).all();
+      return ok({ signups: r.results.map((x) => ({ id: x.member_id, username: x.username, discordName: x.discord_name, ...publicSignup(x) })) });
+    }
+    const id = route[2];
+    const row = id ? await db.prepare(`SELECT * FROM signups WHERE member_id = ?1`).bind(id).first() : null;
+    if (!row) return err("That sign-up was withdrawn.", 404);
+    if (M === "POST") {
+      const action = (await readJson(request)).action;
+      if (action === "approve") {
+        const coached = await db.prepare(`SELECT display FROM members WHERE status = 'approved' AND id != ?2 AND (',' || teams || ',') LIKE ?1`).bind(`%,${row.team},%`).first();
+        if (coached) return err(`${coached.display} already runs the ${TEAM_NAMES[row.team] || row.team}.`, 409);
+        await db.batch([
+          db.prepare(`UPDATE signups SET status = 'approved', updated = ?2 WHERE member_id = ?1`).bind(id, t),
+          db.prepare(`UPDATE members SET status = 'approved', override = 'approved', gate = NULL, fan = 0, teams = ?2 WHERE id = ?1`).bind(id, row.team),
+        ]);
+        return ok({ success: true });
+      }
+      if (action === "decline") {
+        await db.prepare(`UPDATE signups SET status = 'declined', updated = ?2 WHERE member_id = ?1`).bind(id, t).run();
+        return ok({ success: true });
+      }
+      return err("Approve or decline.");
+    }
+    if (M === "DELETE") {
+      await db.prepare(`DELETE FROM signups WHERE member_id = ?1`).bind(id).run();
+      return ok({ success: true });
+    }
+  }
+  return null;
 }
 
 /* =====================================================================

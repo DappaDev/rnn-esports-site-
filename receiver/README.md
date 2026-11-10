@@ -161,6 +161,18 @@ Coaches paste YouTube, Twitch clip or video, or TikTok links in **Locker Room �
 ### Trash Talk
 Anyone can read it. Coaches and fans post after signing in with Discord. Fans don't land in your approval queue. Posts are limited to 280 characters, one every 15 seconds, with five emoji reactions. Commissioners can **Delete** any post or **Block** a person. Blocked people can be restored in **Commissioner → Members**.
 
+## Join the League sign-ups
+
+The **Join the League** page lets people claim one of the open teams. They sign in with Discord when they send the form, and what they typed is kept while they sign in.
+- Everyone sees which teams are **open**, **requested** or **coached**. Contact details are only shown to commissioners.
+- New sign-ups post to your commissioners' Discord channel (`WEBHOOK_SIGNUPS`) without the applicant's contact details.
+- Applicants don't show up under **Locker Room → Waiting for approval**. Commissioners review them on the **Join page** under **Sign-Up Requests**, and **Commissioner** shows how many are waiting.
+  - **Approve** makes them a Locker Room coach with that team.
+  - **Decline** frees the team, and the applicant sees that it wasn't approved.
+  - **Remove** deletes the sign-up.
+- Applicants can change or withdraw their request until it's approved.
+- An approved coach also needs a coach card on the home page. Send the card to Claude to add it.
+
 ## Addresses
 
 | Address | What it's for |
@@ -172,6 +184,7 @@ Anyone can read it. Coaches and fans post after signing in with Discord. Fans do
 | `/auth/discord/login` | Starts Discord sign-in for the Locker Room |
 | `/api/game-times/public` | Public: confirmed game times shown on the schedule |
 | `/api/live` | Public to the league site: countdown, stream, chat channel, Matchup of the Week and approved highlights |
+| `/api/signups/board` | Join page: which teams are requested or filled. No contact details |
 | `/api/talk` | Trash Talk: anyone can read it, and signed-in people can post and react |
 | `/api/...` (other) | Locker Room data. Signed-in, approved members only, and only from the league site |
 
