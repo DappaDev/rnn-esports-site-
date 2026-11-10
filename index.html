@@ -687,6 +687,10 @@ html,body{overflow-x:clip}
 @media (max-width:520px){.tk{grid-template-columns:1fr}.tk .lk-av{display:none}.tk-foot{grid-column:1}.talk-row .submit{width:100%}}
 
 /* locker: commissioner fan tools */
+.f-who{margin:0;font-size:15px;color:var(--ice-dim)}.f-who b{color:var(--ice)}.f-who button{font:inherit;background:none;border:0;color:var(--sky);text-decoration:underline;cursor:pointer;padding:0;margin-left:6px}
+.su-st{font-family:var(--f-cond);font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:3px;background:var(--navy-600);white-space:nowrap}
+.su-st.approved{background:var(--neon);color:var(--ink)}.su-st.declined{background:#5a2124;color:#ffb3b5}
+.admin td .btn{margin:2px 4px 2px 0}
 .lk-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
 @media (max-width:640px){.lk-grid2{grid-template-columns:1fr}}
 .bc-state{font-family:var(--f-sign);font-size:13px;padding:4px 10px;border:2px solid var(--ink);background:var(--navy-600);color:var(--ice-dim)}
@@ -1017,6 +1021,8 @@ html,body{overflow-x:clip}
             </div>
             <div class="lk-row"><span class="lk-hint" id="mw-state">No matchup set.</span><span class="lk-row"><button type="button" class="btn" id="mw-toggle" hidden>Close voting</button><button type="submit" class="submit">Start new vote</button></span></div>
           </form>
+          <h3 class="lk-h3">League sign-ups</h3>
+          <p class="lk-hint" id="adm-signups">Checking…</p>
           <h3 class="lk-h3">Highlights to review</h3>
           <div id="adm-clips" class="lk-list"></div>
           <h3 class="lk-h3">Waiting for approval</h3>
@@ -1168,6 +1174,7 @@ html,body{overflow-x:clip}
               </div>
             </fieldset>
             <div class="fld"><label for="f-note">Trash talk for the broadcast <span style="color:var(--ice-dim);letter-spacing:.06em">(optional)</span></label><textarea id="f-note" maxlength="240" placeholder="One line the RNN crew can read on air"></textarea></div>
+            <p class="f-who" id="f-who" hidden></p>
             <button type="submit" class="submit" id="f-submit">Claim my team</button>
             <p class="msg" id="f-msg" role="status"></p>
           </form>
@@ -1185,7 +1192,7 @@ html,body{overflow-x:clip}
       </div>
       <div class="admin" id="admin" hidden>
         <div class="sec-head" style="margin-top:44px"><div><h2>Sign-Up Requests</h2><p class="sub">Visible to league admins only</p></div></div>
-        <div class="tbl"><table><thead><tr><th>Coach</th><th>Team</th><th>Console · ID</th><th>Contact</th><th>Experience</th><th>Nights</th><th>Trash talk</th><th>Received</th><th></th></tr></thead><tbody id="admin-rows"></tbody></table></div>
+        <div class="tbl"><table><thead><tr><th>Coach</th><th>Team</th><th>Console · ID</th><th>Contact</th><th>Experience</th><th>Nights</th><th>Trash talk</th><th>Received</th><th>Status</th><th></th></tr></thead><tbody id="admin-rows"></tbody></table></div>
       </div>
     </div>
   </section>
@@ -1329,23 +1336,26 @@ function requestedBy(ab){ // claim docs from other people
 }
 function teamState(ab){
   if(COACHED[ab]) return 'taken';
-  if(requestedBy(ab).length) return 'req';
+  const o=requestedBy(ab);
+  if(o.some(([,c])=>c.status==='approved')) return 'taken';
+  if(o.length) return 'req';
   return 'open';
 }
+const coachNames=ab=>COACHED[ab]||requestedBy(ab).filter(([,c])=>c.status==='approved').map(([,c])=>c.coach);
 function renderBoard(){
   const groups={};
   TEAMS.forEach(t=>{(groups[t.conf+' '+t.div]=groups[t.conf+' '+t.div]||[]).push(t);});
   $('divs').innerHTML=Object.entries(groups).map(([g,ts])=>`
     <div class="div"><h3>${g}</h3><ul>${ts.map(t=>{
       const s=teamState(t.ab), mine=J.myClaim&&J.myClaim.team===t.ab;
-      const sub=s==='taken'?'Coach '+COACHED[t.ab].join(' & '):s==='req'?'Request pending':mine?'Your request':'Open seat';
+      const sub=s==='taken'?'Coach '+coachNames(t.ab).join(' & '):s==='req'?'Request pending':mine?'Your request':'Open seat';
       const badge=s==='taken'?'Coached':s==='req'?'Requested':mine?'Yours':'Open';
       return `<li><button type="button" class="tile ${s}" style="--c1:${t.c1};--c2:${t.c2}" data-ab="${t.ab}" ${s!=='open'?'aria-disabled="true"':''} aria-pressed="${J.pick===t.ab}" aria-label="${t.full}, ${sub}">
         <span class="ab">${t.ab}</span><span><span class="tn">${t.name}</span><br><span class="ts">${esc(sub)}</span></span><span class="st">${badge}</span></button></li>`;
     }).join('')}</ul></div>`).join('');
   // counts
-  const taken=TEAMS.filter(t=>COACHED[t.ab]).length;
-  const req=TEAMS.filter(t=>!COACHED[t.ab]&&Object.values(J.claims).some(c=>c.team===t.ab)).length;
+  const taken=TEAMS.filter(t=>teamState(t.ab)==='taken'||(J.myClaim&&J.myClaim.team===t.ab&&J.myClaim.status==='approved')).length;
+  const req=TEAMS.filter(t=>teamState(t.ab)!=='taken'&&Object.values(J.claims).some(c=>c.team===t.ab&&c.status!=='approved')).length;
   const open=32-taken-req;
   $('seats').textContent=open; $('k-taken').textContent=taken; $('k-req').textContent=req; $('k-open').textContent=open;
   $('m-taken').style.width=(taken/32*100)+'%'; $('m-req').style.width=(req/32*100)+'%';
@@ -1378,7 +1388,10 @@ function showMine(){
   if(show){
     const t=TEAM[s.team];
     $('mine-title').textContent=`${s.coach} · ${t?t.full:s.team}`;
-    $('mine-text').textContent=`Your request is in. The RNN commissioner will reach out at ${s.contact} to confirm your seat. Requested ${new Date(s.at).toLocaleDateString()}.`;
+    const ok=s.status==='approved';
+    $('mine-text').textContent=ok?`You’re in! The commissioner confirmed your seat. Head to the Locker Room to meet the league and schedule your games.`
+      :`Your request is in. The RNN commissioner will reach out at ${s.contact} to confirm your seat. Requested ${new Date(s.at).toLocaleDateString()}.`;
+    $('mine-edit').hidden=ok; $('mine-withdraw').hidden=ok;
   }
 }
 // PS5 players give a PSN ID, Xbox players a Gamertag
@@ -1395,20 +1408,23 @@ function fillForm(s){
   document.querySelectorAll('#f-days input').forEach(i=>i.checked=(s.days||[]).includes(i.value));
   $('p-nm').textContent=s.coach||'Coach Name'; setPick(s.team);
 }
-$('mine-edit').addEventListener('click',()=>{J.editing=true; fillForm(J.mySignup); $('f-submit').textContent='Save changes'; showMine();});
+$('mine-edit').addEventListener('click',()=>{J.editing=true; fillForm(J.mySignup); $('f-submit').textContent='Save changes'; showMine(); if(API_BASE) renderWho();});
 $('mine-withdraw').addEventListener('click',()=>{$('withdraw-confirm').hidden=false;});
 $('withdraw-no').addEventListener('click',()=>{$('withdraw-confirm').hidden=true;});
 $('withdraw-yes').addEventListener('click',async()=>{
   try{
-    await J.db.doc('claims/'+J.me).delete(); await J.db.doc('signups/'+J.me).delete();
+    if(API_BASE) await api('/api/signups/mine',{method:'DELETE'});
+    else {await J.db.doc('claims/'+J.me).delete(); await J.db.doc('signups/'+J.me).delete();}
     J.mySignup=null; J.myClaim=null; J.editing=false; $('withdraw-confirm').hidden=true;
     $('sheet').reset(); setPick(null); $('p-nm').textContent='Coach Name'; $('f-submit').textContent='Claim my team';
     showMine(); msg('Your request was withdrawn. The team is open again.','ok');
-  }catch(e){msg("Couldn't withdraw right now. Check your connection and try again.",'err');}
+    if(API_BASE) loadJoinBoard();
+  }catch(e){msg(API_BASE&&e.message?e.message:"Couldn't withdraw right now. Check your connection and try again.",'err');}
 });
 
 $('sheet').addEventListener('submit',async e=>{
   e.preventDefault();
+  if(API_BASE) return submitToLeague();
   if(!J.db||!J.me){msg('Sign in to claude.ai to claim a team. Signed-out visitors can browse the board but can’t submit.','err');return;}
   const coach=$('f-coach').value.trim(), psn=$('f-psn').value.trim(), contact=$('f-contact').value.trim();
   const days=[...document.querySelectorAll('#f-days input:checked')].map(i=>i.value);
@@ -1440,19 +1456,98 @@ function renderAdmin(docs){
     <td><b>${esc(r.coach)}</b></td><td>${esc(TEAM[r.team]?.full||r.team)}</td><td><b>${esc(r.console||'PS5')}</b> · ${esc(r.psn)}</td><td style="user-select:all">${esc(r.contact)}</td>
     <td>${esc(r.exp)}</td><td>${esc((r.days||[]).join(', '))}</td><td>${esc(r.note)}</td><td>${r.at?new Date(r.at).toLocaleDateString():''}</td>
     <td><button type="button" class="btn danger" data-del="${esc(r.id)}">Remove</button></td></tr>`).join('')
-    :'<tr><td colspan="9" class="empty">No sign-ups yet. Requests appear here as soon as someone claims a team.</td></tr>';
+    :'<tr><td colspan="10" class="empty">No sign-ups yet. Requests appear here as soon as someone claims a team.</td></tr>';
 }
 $('admin-rows').addEventListener('click',async e=>{
-  const b=e.target.closest('[data-del]'); if(!b) return;
+  const b=e.target.closest('[data-del]'); if(!b||API_BASE) return;
   if(b.dataset.confirm!=='1'){b.dataset.confirm='1'; b.textContent='Confirm remove'; return;}
   b.disabled=true;
   try{await J.db.doc('claims/'+b.dataset.del).delete(); await J.db.doc('signups/'+b.dataset.del).delete();}
   catch(_){b.disabled=false; b.textContent='Try again';}
 });
 
+/* ---- League server sign-ups (the public site) ---- */
+const fromLeague=x=>x&&({team:x.team,coach:x.coach,console:x.console,psn:x.gamerId,contact:x.contact,exp:x.exp,days:x.days,note:x.note,at:x.created,status:x.status});
+function readForm(){return {team:J.pick,coach:$('f-coach').value.trim(),console:$('f-console').value==='Xbox'?'Xbox':'PS5',psn:$('f-psn').value.trim(),contact:$('f-contact').value.trim(),
+  exp:$('f-exp').value,days:[...document.querySelectorAll('#f-days input:checked')].map(i=>i.value),note:$('f-note').value.trim()};}
+function renderWho(){
+  const w=$('f-who'); if(!API_BASE){w.hidden=true;return;}
+  w.hidden=false;
+  if(J.meLeague){w.innerHTML=`Signed in with Discord as <b>${esc(J.meLeague.display)}</b><button type="button" id="f-signout">Not you?</button>`;
+    $('f-submit').textContent=J.editing?'Save changes':'Claim my team';}
+  else{w.textContent='You’ll sign in with Discord when you send this, so the commissioner knows who you are.';
+    $('f-submit').textContent='Sign in with Discord & claim';}
+}
+$('f-who').addEventListener('click',async e=>{ if(!e.target.closest('#f-signout')) return;
+  try{await api('/api/logout',{method:'POST'});}catch(_){} tokSet(null); LK.me=null; J.meLeague=null; J.mySignup=null; J.myClaim=null; J.editing=false; showMine(); loadJoinBoard(); });
+async function loadJoinBoard(){
+  try{
+    const d=await api('/api/signups/board');
+    J.me='me'; J.meLeague=d.me; J.claims={};
+    d.claims.forEach((c,i)=>{J.claims[c.mine?'me':'c'+i]={team:c.team,coach:c.coach,status:c.status};});
+    J.myClaim=J.claims.me||null; J.mySignup=fromLeague(d.mine);
+    if(J.mySignup&&!J.editing){setPick(J.mySignup.team);}
+    else if(J.pick&&teamState(J.pick)!=='open'&&!(J.myClaim&&J.myClaim.team===J.pick)) setPick(null); else renderBoard();
+    showMine(); renderWho();
+    if(d.declined&&!J.mySignup) msg(`Your request for the ${TEAM[d.declined]?.name||d.declined} wasn’t approved this time. You can pick another open team.`,'err');
+    if(d.me&&d.me.admin) loadSignupsAdmin();
+  }catch(e){msg('The draft board can’t be reached right now. Open teams may be out of date.','err');}
+}
+async function submitToLeague(){
+  const f=readForm();
+  if(!f.team){msg('Pick an open team from the draft board first.','err');document.getElementById('board').scrollIntoView();return;}
+  if(teamState(f.team)!=='open'&&!(J.myClaim&&J.myClaim.team===f.team)){msg(`The ${TEAM[f.team].name} were just requested by someone else. Pick another open team.`,'err');return;}
+  if(!f.coach){msg('Add the coach name the broadcast should use.','err');$('f-coach').focus();return;}
+  if(!f.psn){msg(f.console==='Xbox'?'Add your Xbox Gamertag so we can send game invites.':'Add your PSN ID so we can send game invites.','err');$('f-psn').focus();return;}
+  if(!f.contact){msg('Add an email or phone number so the commissioner can confirm your seat.','err');$('f-contact').focus();return;}
+  if(!f.days.length){msg('Pick at least one night you can play.','err');return;}
+  if(!J.meLeague){ // keep what they typed, sign in, come back
+    try{sessionStorage.setItem('rnn-join-draft',JSON.stringify(f));sessionStorage.setItem('rnn-after','join');}catch(_){}
+    msg('Taking you to Discord to sign in…'); location.href=API_BASE.replace(/\/$/,'')+'/auth/discord/login?for=join'; return;
+  }
+  $('f-submit').disabled=true; msg('Sending your request…');
+  try{
+    const r=await api('/api/signups',{method:'POST',body:{team:f.team,coach:f.coach,console:f.console,gamerId:f.psn,contact:f.contact,exp:f.exp,days:f.days,note:f.note}});
+    J.mySignup=fromLeague(r.signup); J.editing=false; msg('');
+    await loadJoinBoard(); $('mine').scrollIntoView({block:'center'});
+  }catch(err){msg(err.message,'err'); if(err.status===409||err.status===401) loadJoinBoard();}
+  finally{$('f-submit').disabled=false;}
+}
+async function loadSignupsAdmin(){
+  try{
+    const {signups}=await api('/api/admin/signups');
+    $('admin').hidden=false;
+    $('admin-rows').innerHTML=signups.length?signups.map(r=>`<tr>
+      <td><b>${esc(r.coach)}</b><br><span class="lk-meta">@${esc(r.username||'')}</span></td><td>${esc(TEAM[r.team]?.full||r.team)}</td><td><b>${esc(r.console||'PS5')}</b> · ${esc(r.gamerId)}</td><td style="user-select:all">${esc(r.contact)}</td>
+      <td>${esc(r.exp)}</td><td>${esc((r.days||[]).join(', '))}</td><td>${esc(r.note)}</td><td>${r.created?new Date(r.created).toLocaleDateString():''}</td>
+      <td><span class="su-st ${esc(r.status)}">${r.status==='approved'?'Approved':r.status==='declined'?'Declined':'Waiting'}</span></td>
+      <td>${r.status==='pending'?`<button type="button" class="btn ok" data-su-ok="${esc(r.id)}">Approve</button><button type="button" class="btn danger" data-su-no="${esc(r.id)}">Decline</button>`:''}<button type="button" class="btn danger" data-su-del="${esc(r.id)}">Remove</button></td></tr>`).join('')
+      :'<tr><td colspan="10" class="empty">No sign-ups yet. Requests appear here as soon as someone claims a team.</td></tr>';
+  }catch(_){}
+}
+$('admin-rows').addEventListener('click',async e=>{
+  if(!API_BASE) return;
+  const b=e.target.closest('[data-su-ok],[data-su-no],[data-su-del]'); if(!b) return;
+  if(b.dataset.confirm!=='1'){b.dataset.confirm='1'; b.textContent=b.dataset.suOk?'Confirm approve':b.dataset.suNo?'Confirm decline':'Confirm remove'; return;}
+  b.disabled=true;
+  try{
+    if(b.dataset.suOk) await api('/api/admin/signups/'+encodeURIComponent(b.dataset.suOk),{method:'POST',body:{action:'approve'}});
+    if(b.dataset.suNo) await api('/api/admin/signups/'+encodeURIComponent(b.dataset.suNo),{method:'POST',body:{action:'decline'}});
+    if(b.dataset.suDel) await api('/api/admin/signups/'+encodeURIComponent(b.dataset.suDel),{method:'DELETE'});
+    msg(b.dataset.suOk?'Approved. They’re now a coach in the Locker Room with that team.':b.dataset.suNo?'Declined. The team is open again.':'Sign-up removed.','ok');
+  }catch(err){msg(err.message,'err');}
+  loadJoinBoard();
+});
+
 window.initJoin=async function(){
   if(J.inited) return; J.inited=true;
   renderBoard(); setPick(null);
+  if(API_BASE){
+    await loadJoinBoard();
+    let draft=null; try{draft=JSON.parse(sessionStorage.getItem('rnn-join-draft')||'null');sessionStorage.removeItem('rnn-join-draft');}catch(_){}
+    if(draft&&J.meLeague&&!J.mySignup){fillForm(draft); renderWho(); msg('You’re signed in. Check your details, then tap Claim my team to send it.','ok'); $('sheet').scrollIntoView({block:'center'});}
+    return;
+  }
   if(!window.claude||!claude.use){msg('Sign-ups open when this page is viewed on claude.ai.','');return;}
   const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]);
   J.db=db; J.user=user;
@@ -1823,6 +1918,7 @@ window.initLocker=async function(h){
       let after=null; try{after=sessionStorage.getItem('rnn-after');sessionStorage.removeItem('rnn-after');}catch(_){}
       if(window.loadTalk) loadTalk();
       if(after==='talk'){location.hash='talk'; return;}
+      if(after==='join'){location.hash='join'; return;}
       showLocker();return;}
     catch(e){$('lk-out-msg').textContent=e.message;}
   } else if(h&&h.startsWith('login-error=')){
@@ -1830,6 +1926,7 @@ window.initLocker=async function(h){
     const why=LOGIN_ERRORS[decodeURIComponent(h.slice(12))]||'Sign-in didn’t finish. Please try again.';
     let after=null; try{after=sessionStorage.getItem('rnn-after');sessionStorage.removeItem('rnn-after');}catch(_){}
     if(after==='talk'){location.hash='talk'; setTimeout(()=>talkMsg(why,'err'),50); return;}
+    if(after==='join'){location.hash='join'; setTimeout(()=>msg(why,'err'),300); return;}
     $('lk-out-msg').textContent=why;
   }
   if(!LK.inited||!LK.me||LK.me.status!=='approved'){LK.inited=true; await loadMe();} else showLocker();
@@ -2154,7 +2251,9 @@ const teamOpts=sel=>[...TEAMS].sort((a,b)=>a.full.localeCompare(b.full)).map(t=>
 const toLocalInput=iso=>{if(!iso) return ''; const d=new Date(iso); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;};
 async function loadAdminFan(){
   try{
-    const [L,{highlights}]=await Promise.all([fzGet('/api/live'),api('/api/admin/highlights')]);
+    const [L,{highlights},{signups}]=await Promise.all([fzGet('/api/live'),api('/api/admin/highlights'),api('/api/admin/signups')]);
+    const waiting=signups.filter(x=>x.status==='pending').length;
+    $('adm-signups').innerHTML=waiting?`<b>${waiting}</b> waiting for review. <a href="#join">Review them on the Join page</a>.`:'No new sign-ups. They show on the <a href="#join">Join page</a> when someone claims a team.';
     FZ.live=L; renderOnAir(); renderMotw(); renderClips();
     const b=L.broadcast;
     if(!$('bc-form').contains(document.activeElement)){
