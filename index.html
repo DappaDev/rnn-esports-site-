@@ -212,6 +212,83 @@ footer img{width:28px;height:28px}
 .none{color:var(--ice-dim);padding:12px 0}
 @media (max-width:520px){.chip{width:38px;height:38px}.chip img{width:28px;height:28px}.tm-name{font-size:16px}.game{padding:14px 10px 10px}}
 
+
+/* ---------- Locker Room ---------- */
+.mnav{position:relative;display:none}
+.mnav summary{list-style:none;cursor:pointer}
+.mnav summary::-webkit-details-marker{display:none}
+.mnav nav{position:absolute;right:0;top:calc(100% + 8px);z-index:20;display:grid;min-width:190px;background:var(--navy-800);border:3px solid var(--ink);box-shadow:var(--shadow-hard)}
+.mnav nav a{font-family:var(--f-sign);font-size:14px;color:var(--ice);text-decoration:none;padding:12px 14px;border-bottom:1px solid var(--line)}
+.mnav nav a:last-child{border-bottom:0;background:var(--neon);color:var(--ink)}
+@media (max-width:820px){.mnav{display:block;margin-left:auto}.mnav+.mobile-join{margin-left:0}}
+.lk-card{border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:var(--navy-800);border-radius:4px;padding:26px 24px;max-width:640px;display:grid;gap:12px;justify-items:start}
+.lk-card h2{margin:0}.lk-card p{margin:0;color:var(--ice-dim)}
+.lk-me{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.lk-me img{width:48px;height:48px;border-radius:50%;border:3px solid var(--neon);object-fit:cover}
+.lk-me b{display:block;font-family:var(--f-tag);font-size:24px;font-weight:400}
+.lk-me>div{display:grid;gap:4px;min-width:0}
+.lk-me .btn{margin-left:auto}
+.lk-tabs{margin-bottom:10px}
+.lk-pane{display:grid;gap:16px}
+.lk-list{display:grid;gap:14px}
+.lk-form{max-width:760px}
+.lk-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.lk-check{display:flex;gap:8px;align-items:center;font-family:var(--f-cond);font-size:16px;letter-spacing:.04em}
+.lk-check input{accent-color:var(--neon);width:18px;height:18px}
+.lk-post{background:var(--navy-800);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:4px;padding:16px 18px;max-width:860px}
+.lk-post.pinned{border-color:var(--neon);box-shadow:4px 4px 0 var(--ink),0 0 0 1px var(--neon)}
+.lk-post.reply{margin-left:28px;padding:12px 16px}
+.lk-post header{display:flex;gap:12px;align-items:flex-start}
+.lk-post header>div{min-width:0;flex:1}
+.lk-post h3{margin:0;font-family:var(--f-sign);font-weight:400;font-size:19px;line-height:1.2}
+.lk-meta{display:inline-block;font-size:13px;color:var(--ice-dim);font-family:var(--f-cond);letter-spacing:.04em}
+.lk-meta b{color:var(--neon);font-weight:700}
+.lk-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0 0;max-width:70ch}
+.lk-del{padding:4px 10px;font-size:12px}
+.lk-av{border-radius:50%;object-fit:cover;flex:0 0 auto;background:var(--navy-600)}
+.lk-av-blank{display:inline-grid;place-items:center;font-family:var(--f-sign);color:var(--ink);background:var(--sky)}
+.lk-thread{display:flex;gap:12px;align-items:center;text-align:left;font:inherit;color:inherit;background:var(--navy-800);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:4px;padding:12px 16px;cursor:pointer;max-width:860px;width:100%}
+.lk-thread:hover{border-color:var(--sky)}
+.lk-thread b{display:block;font-family:var(--f-sign);font-weight:400;font-size:17px}
+.lk-thread>span{min-width:0}
+#thread-view{display:grid;gap:14px}
+#thread-view>.btn{justify-self:start}
+#thread-body{display:grid;gap:12px}
+.lk-hint{color:var(--ice-dim);font-size:15px;margin:0;max-width:70ch}
+.lk-team{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-cond);font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.04em;margin-right:8px}
+.lk-team img{width:22px;height:22px;border-radius:50%;background:var(--ice);padding:2px}
+.lk-game{background:var(--navy-800);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:4px;padding:12px 14px;display:grid;gap:10px;max-width:900px}
+.lk-game-top{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
+.lk-wk{font-family:var(--f-sign);font-size:13px;background:var(--neon);color:var(--ink);padding:2px 8px;border:2px solid var(--ink);margin-right:6px}
+.mid-at{font-family:var(--f-tag);color:var(--neon);margin-right:8px}
+.lk-game-st{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.lk-status{font-family:var(--f-cond);font-weight:700;font-size:15px;letter-spacing:.04em;padding:3px 10px;border-radius:3px}
+.tbd-s{background:var(--navy-600);color:var(--ice-dim)}
+.prop-s{background:var(--sky);color:var(--ink)}
+.ok-s{background:var(--neon);color:var(--ink)}
+.lk-propose input{font:inherit;font-size:15px;color:var(--ice);background:var(--navy-900);border:1px solid var(--line);border-radius:3px;padding:7px 10px;min-width:0;color-scheme:dark}
+.lk-propose input:not([type]){flex:1;min-width:140px}
+.lk-propose{justify-content:flex-start}
+.btn.ok{background:var(--neon);color:var(--ink)}
+.lk-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}
+.lk-person{display:grid;justify-items:center;text-align:center;gap:6px;background:var(--navy-800);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:4px;padding:16px 12px}
+.lk-person b{font-family:var(--f-tag);font-weight:400;font-size:19px}
+.lk-person.row{display:flex;justify-items:start;text-align:left;flex-wrap:wrap;align-items:center;max-width:900px}
+.lk-person.row>span{flex:1;min-width:160px;display:grid}
+.lk-person select,.tbl select{font:inherit;font-size:14px;color:var(--ice);background:var(--navy-900);border:1px solid var(--line);border-radius:3px;padding:6px 8px;max-width:100%}
+.lk-h3{font-family:var(--f-sign);font-weight:400;font-size:18px;margin:10px 0 0;color:var(--sky)}
+.lk-invite input{font:inherit;font-size:15px;color:var(--ice);background:var(--navy-900);border:1px solid var(--line);border-radius:3px;padding:8px 10px;flex:1;max-width:320px;min-width:0}
+.lk-invite{justify-content:flex-start}
+.lk-chips{display:flex;flex-wrap:wrap;gap:8px}
+.lk-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-cond);font-size:15px;background:var(--navy-800);border:1px solid var(--line);border-radius:20px;padding:4px 6px 4px 12px}
+.lk-chip button{font:inherit;background:var(--navy-600);color:var(--ice);border:0;border-radius:50%;width:22px;height:22px;cursor:pointer}
+.lk-mcell{display:flex;gap:10px;align-items:center}.lk-mcell>span{display:grid}
+.lk-when{color:var(--neon)!important}
+.lk-discord{text-decoration:none;display:inline-flex;align-items:center}
+.lk-discord-top{margin-left:auto}.lk-discord-top+.btn{margin-left:0}
+.lk-me .btn[data-signout]{margin-left:auto}.lk-me .lk-discord-top:not([hidden])+.btn[data-signout]{margin-left:0}
+#lk-msg{margin:0 0 6px}#lk-msg:empty{display:none}
+@media (max-width:520px){.lk-post.reply{margin-left:12px}.lk-me .btn{margin-left:0}}
 /* ---------- Scores & stats ---------- */
 .lg-updated{font-family:var(--f-cond);font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--sky);margin:0}
 .lg-empty{border:1px dashed var(--line);border-radius:6px;padding:28px 24px;background:var(--navy-800);max-width:760px}
@@ -511,9 +588,10 @@ html,body{overflow-x:clip}
       <a href="#coaches">Coaches</a>
       <a href="#schedule" id="nav-sched">Schedule</a>
       <a href="#league" id="nav-league">Scores &amp; Stats</a>
+      <a href="#locker" id="nav-locker">Locker Room</a>
       <a href="#join" class="join-btn" id="nav-join">Join the League</a>
     </nav>
-    <a href="#schedule" class="mobile-join mobile-sched">Schedule</a><a href="#league" class="mobile-join mobile-sched" style="margin-left:0">Scores</a><a href="#join" class="mobile-join" style="margin-left:0">Join</a>
+    <details class="mnav" id="mnav"><summary class="mobile-join mobile-sched">Menu</summary><nav aria-label="Pages"><a href="#">Home</a><a href="#coaches">Coaches</a><a href="#schedule">Schedule</a><a href="#league">Scores &amp; Stats</a><a href="#locker">Locker Room</a><a href="#join">Join the League</a></nav></details><a href="#join" class="mobile-join" style="margin-left:0">Join</a>
   </div>
 </header>
 <div class="ticker" aria-hidden="true"><div class="ticker-track">
@@ -614,6 +692,103 @@ html,body{overflow-x:clip}
 </main>
 </div>
 
+<div id="view-locker" hidden>
+  <div class="sched-hero">
+    <div class="wrap">
+      <div class="eyebrow"><span class="stars">★★★</span> Members only</div>
+      <h1 class="sched-h1">The <span class="tag">Locker</span> Room</h1>
+      <p class="lede">League news from the commissioner, the group chat, and scheduling for your games. Only approved RNN coaches get in.</p>
+    </div>
+  </div>
+  <section class="sched">
+    <div class="wrap">
+      <div class="lk-card" id="lk-offsite" hidden>
+        <h2>Open the league site to sign in</h2>
+        <p>The Locker Room works on the RNN public site. Sign-in isn't available in this preview.</p>
+      </div>
+      <div class="lk-card" id="lk-out" hidden>
+        <h2>Coaches, sign in</h2>
+        <p id="lk-out-text">Use your Discord account. The first time, the commissioner approves you before you can get in.</p>
+        <a class="cta cta-neon" id="lk-signin" href="#locker">Sign in with Discord</a>
+        <p class="msg" id="lk-out-msg" role="status"></p>
+      </div>
+      <div class="lk-card" id="lk-pending" hidden>
+        <h2>You're on the list</h2>
+        <p id="lk-pending-text">Thanks for signing in. The commissioner will approve your account soon, then this page opens up.</p>
+        <div class="lk-row"><a class="btn ok lk-discord" data-discord-link hidden target="_blank" rel="noopener" href="#">Join the RNN Discord</a><button type="button" class="btn ok" id="lk-recheck">Check again</button><button type="button" class="btn" data-signout>Sign out</button></div>
+      </div>
+      <div id="lk-in" hidden>
+        <div class="lk-me">
+          <img id="lk-avatar" alt="" width="48" height="48">
+          <div><b id="lk-name"></b><span id="lk-teams"></span></div>
+          <a class="btn ok lk-discord lk-discord-top" data-discord-link hidden target="_blank" rel="noopener" href="#">Open RNN Discord</a>
+          <button type="button" class="btn" data-signout>Sign out</button>
+        </div>
+        <div class="weeks lk-tabs" role="tablist" aria-label="Locker Room sections">
+          <button type="button" role="tab" data-lt="news" aria-selected="true">Announcements</button>
+          <button type="button" role="tab" data-lt="board" aria-selected="false">Message Board</button>
+          <button type="button" role="tab" data-lt="games" aria-selected="false">My Games</button>
+          <button type="button" role="tab" data-lt="people" aria-selected="false">Members</button>
+          <button type="button" role="tab" data-lt="admin" aria-selected="false" hidden id="lk-admin-tab">Commissioner</button>
+        </div>
+        <p class="msg" id="lk-msg" role="status"></p>
+
+        <div class="lk-pane" data-pane="news">
+          <form class="sheet lk-form" id="ann-form" hidden novalidate>
+            <div class="fld"><label for="ann-title">New announcement</label><input id="ann-title" maxlength="120" placeholder="Headline"></div>
+            <div class="fld"><label for="ann-body" class="sr">Message</label><textarea id="ann-body" maxlength="4000" placeholder="What does the league need to know?"></textarea></div>
+            <div class="lk-row"><span class="lk-row" style="justify-content:flex-start"><label class="lk-check"><input type="checkbox" id="ann-pin"> Pin to top</label><label class="lk-check"><input type="checkbox" id="ann-discord" checked> Also post to Discord</label></span><button type="submit" class="submit">Post announcement</button></div>
+          </form>
+          <div id="ann-list" class="lk-list"></div>
+        </div>
+
+        <div class="lk-pane" data-pane="board" hidden>
+          <div id="board-list-wrap">
+            <form class="sheet lk-form" id="thread-form" novalidate>
+              <div class="fld"><label for="th-title">Start a thread</label><input id="th-title" maxlength="120" placeholder="Topic"></div>
+              <div class="fld"><label for="th-body" class="sr">Message</label><textarea id="th-body" maxlength="4000" placeholder="Say it with your chest"></textarea></div>
+              <div class="lk-row"><span></span><button type="submit" class="submit">Post</button></div>
+            </form>
+            <div id="thread-list" class="lk-list"></div>
+          </div>
+          <div id="thread-view" hidden>
+            <button type="button" class="btn" id="thread-back">← All threads</button>
+            <div id="thread-body"></div>
+            <form class="sheet lk-form" id="reply-form" novalidate>
+              <div class="fld"><label for="rp-body">Reply</label><textarea id="rp-body" maxlength="4000"></textarea></div>
+              <div class="lk-row"><span></span><button type="submit" class="submit">Reply</button></div>
+            </form>
+          </div>
+        </div>
+
+        <div class="lk-pane" data-pane="games" hidden>
+          <p class="lk-hint">Pick a time with your opponent. When you propose one, they confirm it here, and confirmed times show on the public schedule. Times are shown in your own time zone.</p>
+          <div id="games-list" class="lk-list"></div>
+        </div>
+
+        <div class="lk-pane" data-pane="people" hidden>
+          <div id="people-list" class="lk-people"></div>
+        </div>
+
+        <div class="lk-pane" data-pane="admin" hidden>
+          <h3 class="lk-h3">Waiting for approval</h3>
+          <div id="adm-pending" class="lk-list"></div>
+          <h3 class="lk-h3">Needs a team</h3>
+          <div id="adm-noteam" class="lk-list"></div>
+          <h3 class="lk-h3">Pre-approve a coach</h3>
+          <form class="lk-row lk-invite" id="inv-form" novalidate>
+            <label for="inv-user" class="sr">Discord username</label><input id="inv-user" maxlength="40" placeholder="Discord username">
+            <button type="submit" class="btn">Add</button>
+          </form>
+          <div id="adm-invites" class="lk-chips"></div>
+          <h3 class="lk-h3">Members</h3>
+          <div class="tbl"><table><thead><tr><th>Member</th><th>Team</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead><tbody id="adm-members"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
 <div id="view-league" hidden>
   <div class="sched-hero">
     <div class="wrap">
@@ -681,7 +856,7 @@ html,body{overflow-x:clip}
         <div class="eyebrow"><span class="stars">★★★</span> RNN Madden 27 League · Season one</div>
         <h1>Take a seat<br>at the <span class="tag">table.</span></h1>
         <p class="lede">We're filling all 32 franchises. Pick an open team, build your coach card, and get on the RNN broadcast schedule.</p>
-        <a class="cta" href="#signup">Start my sign-up <span aria-hidden="true">↓</span></a>
+        <div class="lk-row" style="justify-content:flex-start;gap:16px"><a class="cta" href="#signup">Start my sign-up <span aria-hidden="true">↓</span></a><a class="cta ghost" data-discord-link hidden target="_blank" rel="noopener" href="#">Join the RNN Discord</a></div>
       </div>
       <div>
         <div class="seats" id="seats">18</div>
@@ -850,19 +1025,23 @@ const JOIN_HASHES=['join','board','signup'];
 let lastView=null;
 function fromHash(){
   const h=location.hash.slice(1);
-  const view=JOIN_HASHES.includes(h)?'join':h==='schedule'?'schedule':h==='league'?'league':'home';
+  const view=JOIN_HASHES.includes(h)?'join':h==='schedule'?'schedule':h==='league'?'league':(h==='locker'||h.startsWith('login'))?'locker':'home';
   document.getElementById('view-home').hidden=view!=='home';
   document.getElementById('view-join').hidden=view!=='join';
   document.getElementById('view-schedule').hidden=view!=='schedule';
   document.getElementById('view-league').hidden=view!=='league';
+  document.getElementById('view-locker').hidden=view!=='locker';
+  const mn=document.getElementById('mnav'); if(mn) mn.open=false;
   document.getElementById('nav-join').setAttribute('aria-current',view==='join'?'page':'false');
   document.getElementById('nav-sched').setAttribute('aria-current',view==='schedule'?'page':'false');
   document.getElementById('nav-league').setAttribute('aria-current',view==='league'?'page':'false');
-  document.title=view==='join'?'Join the League · RNN E-Sports':view==='schedule'?'Schedule · RNN E-Sports':view==='league'?'Scores & Stats · RNN E-Sports':'RNN E-Sports';
+  document.getElementById('nav-locker').setAttribute('aria-current',view==='locker'?'page':'false');
+  document.title=view==='join'?'Join the League · RNN E-Sports':view==='schedule'?'Schedule · RNN E-Sports':view==='league'?'Scores & Stats · RNN E-Sports':view==='locker'?'Locker Room · RNN E-Sports':'RNN E-Sports';
   if(view==='schedule'&&window.initSched) window.initSched();
   if(view==='league'&&window.initLeague) window.initLeague();
+  if(view==='locker'&&window.initLocker) window.initLocker(h);
   if(view!==lastView){
-    if(h==='join'||h==='schedule'||h==='league'||(!h&&lastView)) window.scrollTo(0,0);
+    if(h==='join'||h==='schedule'||h==='league'||h==='locker'||h.startsWith('login')||(!h&&lastView)) window.scrollTo(0,0);
     else if(h&&!h.startsWith('coach-')){const t=document.getElementById(h); if(t) t.scrollIntoView();}
     lastView=view;
   }
@@ -1113,6 +1292,8 @@ function resultFor(w,a,h){
 }
 function midCell(g){
   const r=resultFor(g.w,g.a,g.h);
+  const ct=window.GAME_TIMES&&GAME_TIMES[`W${g.w}-${g.a}@${g.h}`];
+  if(!r&&ct){const d=new Date(ct); return `<span class="tbd lk-when">${d.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})}</span><span class="tbd lk-when">${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`;}
   if(!r) return '<span class="tbd">Date TBD</span><span class="tbd">Kickoff TBD</span>';
   return `<span class="sc"><span class="score${r.as>r.hs?' win':''}">${r.as}</span><span class="score${r.hs>r.as?' win':''}">${r.hs}</span></span><span class="final">Final</span>`;
 }
@@ -1168,6 +1349,227 @@ LG.listeners.push(()=>{renderLeague(); if(S.inited) renderGames();});
 window.initLeague=function(){renderLeague(); loadLeague();};
 // Pull results early so the schedule shows final scores too.
 loadLeague();
+
+/* ================= LOCKER ROOM (members area) ================= */
+window.GAME_TIMES={};
+const LK={token:null,me:null,tab:'news',thread:null,games:{},inited:false};
+const tokGet=()=>{try{return localStorage.getItem('rnn-token');}catch(_){return LK.token;}};
+const tokSet=t=>{LK.token=t;try{t?localStorage.setItem('rnn-token',t):localStorage.removeItem('rnn-token');}catch(_){}};
+const fmtWhen=iso=>{const d=new Date(iso);return d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});};
+const ago=iso=>{const s=(Date.now()-new Date(iso))/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return new Date(iso).toLocaleDateString([], {month:'short',day:'numeric'});};
+const avatarHtml=(a,size=36)=>a&&a.avatar?`<img class="lk-av" src="${esc(a.avatar)}" alt="" width="${size}" height="${size}">`:`<span class="lk-av lk-av-blank" style="width:${size}px;height:${size}px">${esc(((a&&a.display)||'?')[0])}</span>`;
+const teamTags=ts=>(ts||[]).map(ab=>TEAM[ab]?`<span class="lk-team"><img src="logos/${ab}.png" alt="">${TEAM[ab].name}</span>`:'').join('');
+async function api(path,{method='GET',body}={}){
+  const headers={}; const t=tokGet(); if(t) headers.authorization='Bearer '+t;
+  if(body!==undefined) headers['content-type']='application/json';
+  const ctl=new AbortController(); const tm=setTimeout(()=>ctl.abort(),12000);
+  let res; try{res=await fetch(API_BASE.replace(/\/$/,'')+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:ctl.signal});}
+  catch(e){throw Object.assign(new Error('The league server can’t be reached. Check your connection and try again.'),{status:0});}
+  finally{clearTimeout(tm);}
+  let data={}; try{data=await res.json();}catch(_){}
+  if(res.status===401&&path!=='/api/session'){tokSet(null);LK.me=null;showLocker();}
+  if(!res.ok) throw Object.assign(new Error(data.error||'Something went wrong. Please try again.'),{status:res.status});
+  return data;
+}
+function lkMsg(t,k){const m=$('lk-msg');m.textContent=t||'';m.className='msg'+(k?' '+k:'');}
+function showLocker(){
+  const off=!API_BASE, me=LK.me;
+  $('lk-offsite').hidden=!off;
+  $('lk-out').hidden=off||!!me;
+  $('lk-pending').hidden=off||!me||me.status==='approved';
+  $('lk-in').hidden=off||!me||me.status!=='approved';
+  const pt=$('lk-pending-text');
+  if(me&&me.status==='removed') pt.textContent='Your access to the Locker Room was removed by the commissioner.';
+  else if(me&&me.gate==='not_in_server') pt.textContent='The Locker Room is for members of the RNN Discord server. Join the server, then press Check again.';
+  else if(me&&me.gate==='no_role') pt.textContent='You’re in the RNN Discord, but you don’t have the Coach role yet. Ask the commissioner for it in Discord, then press Check again.';
+  else if(me) pt.textContent='Thanks for signing in. The commissioner will approve your account soon, then this page opens up.';
+  $('lk-recheck').hidden=!!(me&&me.status==='removed');
+  if(me&&me.status==='approved'){
+    $('lk-avatar').src=me.avatar||'assets/rnn-logo-480.png';
+    $('lk-name').textContent=me.display;
+    $('lk-teams').innerHTML=me.teams.length?teamTags(me.teams):'<span class="lk-hint">No team assigned yet</span>';
+    $('lk-admin-tab').hidden=me.role!=='admin';
+    $('ann-form').hidden=me.role!=='admin';
+    openTab(LK.tab);
+  }
+}
+async function loadMe(){
+  if(!tokGet()){LK.me=null;showLocker();return;}
+  try{LK.me=(await api('/api/me')).member;}catch(e){if(e.status!==401)$('lk-out-msg').textContent=e.message;}
+  showLocker();
+}
+function openTab(t){
+  if(t==='admin'&&LK.me.role!=='admin') t='news';
+  LK.tab=t; lkMsg('');
+  document.querySelectorAll('[data-lt]').forEach(b=>b.setAttribute('aria-selected',b.dataset.lt===t));
+  document.querySelectorAll('.lk-pane').forEach(p=>p.hidden=p.dataset.pane!==t);
+  ({news:loadNews,board:loadBoard,games:loadGames,people:loadPeople,admin:loadAdmin})[t]();
+}
+document.querySelectorAll('[data-lt]').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.lt)));
+const wrapErr=fn=>async(...a)=>{try{await fn(...a);}catch(e){lkMsg(e.message,'err');}};
+
+// Announcements
+const loadNews=wrapErr(async()=>{
+  const {announcements}=await api('/api/announcements');
+  $('ann-list').innerHTML=announcements.length?announcements.map(a=>`<article class="lk-post${a.pinned?' pinned':''}">
+    <header>${avatarHtml(a.author)}<div><h3>${esc(a.title)}</h3><span class="lk-meta">${a.pinned?'<b>Pinned</b> · ':''}${esc(a.author?a.author.display:'Commissioner')} · ${ago(a.created)}</span></div>
+    ${LK.me.role==='admin'?`<button type="button" class="btn danger lk-del" data-del-ann="${a.id}">Delete</button>`:''}</header>
+    <p class="lk-text">${esc(a.body)}</p></article>`).join(''):'<p class="none">No announcements yet.</p>';
+});
+$('ann-list').addEventListener('click',wrapErr(async e=>{const b=e.target.closest('[data-del-ann]');if(!b)return;
+  if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='Confirm delete';return;}
+  await api('/api/announcements/'+b.dataset.delAnn,{method:'DELETE'}); loadNews();}));
+$('ann-form').addEventListener('submit',wrapErr(async e=>{e.preventDefault();
+  const title=$('ann-title').value.trim(), body=$('ann-body').value.trim();
+  if(!title||!body){lkMsg('Add a headline and a message.','err');return;}
+  await api('/api/announcements',{method:'POST',body:{title,body,pinned:$('ann-pin').checked,discord:$('ann-discord').checked}});
+  $('ann-form').reset(); $('ann-discord').checked=true; lkMsg('Announcement posted.','ok'); loadNews();}));
+
+// Message board
+const loadBoard=wrapErr(async()=>{
+  if(LK.thread) return openThread(LK.thread);
+  $('board-list-wrap').hidden=false; $('thread-view').hidden=true;
+  const {threads}=await api('/api/threads');
+  $('thread-list').innerHTML=threads.length?threads.map(t=>`<button type="button" class="lk-thread" data-thread="${t.id}">
+    ${avatarHtml(t.author)}<span><b>${esc(t.title)}</b><span class="lk-meta">${esc(t.author?t.author.display:'Former member')} · ${t.reply_count} ${t.reply_count===1?'reply':'replies'} · active ${ago(t.last_activity)}</span></span></button>`).join(''):'<p class="none">No threads yet. Start the first one.</p>';
+});
+const openThread=wrapErr(async id=>{
+  LK.thread=id; $('board-list-wrap').hidden=true; $('thread-view').hidden=false;
+  const {thread,replies}=await api('/api/threads/'+id);
+  const canDel=x=>x.mine||LK.me.role==='admin';
+  $('thread-body').innerHTML=`<article class="lk-post op"><header>${avatarHtml(thread.author)}<div><h3>${esc(thread.title)}</h3><span class="lk-meta">${esc(thread.author?thread.author.display:'Former member')} · ${ago(thread.created)}</span></div>
+    ${canDel(thread)?`<button type="button" class="btn danger lk-del" data-del-thread="${thread.id}">Delete thread</button>`:''}</header><p class="lk-text">${esc(thread.body)}</p></article>`+
+    replies.map(r=>`<article class="lk-post reply"><header>${avatarHtml(r.author,30)}<div><b>${esc(r.author?r.author.display:'Former member')}</b><span class="lk-meta"> · ${ago(r.created)}</span></div>
+    ${canDel(r)?`<button type="button" class="btn danger lk-del" data-del-reply="${r.id}">Delete</button>`:''}</header><p class="lk-text">${esc(r.body)}</p></article>`).join('');
+});
+$('thread-list').addEventListener('click',e=>{const b=e.target.closest('[data-thread]');if(b)openThread(+b.dataset.thread);});
+$('thread-back').addEventListener('click',()=>{LK.thread=null;loadBoard();});
+$('thread-form').addEventListener('submit',wrapErr(async e=>{e.preventDefault();
+  const title=$('th-title').value.trim(), body=$('th-body').value.trim();
+  if(!title||!body){lkMsg('Add a topic and a message.','err');return;}
+  const {id}=await api('/api/threads',{method:'POST',body:{title,body}}); $('thread-form').reset(); openThread(id);}));
+$('reply-form').addEventListener('submit',wrapErr(async e=>{e.preventDefault();
+  const body=$('rp-body').value.trim(); if(!body){lkMsg('Write a reply first.','err');return;}
+  await api(`/api/threads/${LK.thread}/replies`,{method:'POST',body:{body}}); $('reply-form').reset(); openThread(LK.thread);}));
+$('thread-body').addEventListener('click',wrapErr(async e=>{
+  const b=e.target.closest('[data-del-thread],[data-del-reply]'); if(!b) return;
+  if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='Confirm delete';return;}
+  if(b.dataset.delThread){await api('/api/threads/'+b.dataset.delThread,{method:'DELETE'});LK.thread=null;loadBoard();}
+  else{await api('/api/replies/'+b.dataset.delReply,{method:'DELETE'});openThread(LK.thread);}
+}));
+
+// My games
+const loadGames=wrapErr(async()=>{
+  const mine=LK.me.teams;
+  if(!mine.length){$('games-list').innerHTML='<p class="none">The commissioner hasn’t assigned your team yet. Once they do, your 17 games show up here.</p>';return;}
+  const {games}=await api('/api/game-times'); LK.games=Object.fromEntries(games.map(g=>[g.game,g]));
+  const list=GAMES.filter(g=>mine.includes(g.a)||mine.includes(g.h));
+  $('games-list').innerHTML=list.map(g=>{
+    const key=`W${g.w}-${g.a}@${g.h}`, gt=LK.games[key], my=mine.includes(g.a)?g.a:g.h, opp=my===g.a?g.h:g.a;
+    const oppCoach=coachOf(opp)||'Open seat';
+    let status='<span class="lk-status tbd-s">No time yet</span>', actions='';
+    if(gt&&gt.status==='confirmed') status=`<span class="lk-status ok-s">Confirmed · ${fmtWhen(gt.startsAt)}</span>`;
+    else if(gt&&gt.status==='proposed'){
+      const theirs=gt.proposerTeam!==my;
+      status=`<span class="lk-status prop-s">${theirs?esc(oppCoach)+' proposed':'You proposed'} · ${fmtWhen(gt.startsAt)}</span>${gt.note?`<span class="lk-meta">“${esc(gt.note)}”</span>`:''}`;
+      if(theirs) actions=`<button type="button" class="btn ok" data-confirm="${key}">Confirm</button><button type="button" class="btn danger" data-decline="${key}">Decline</button>`;
+    }
+    return `<div class="lk-game" data-key="${key}">
+      <div class="lk-game-top"><span class="lk-wk">Wk ${g.w}</span>${teamTags([g.a])}<span class="mid-at">@</span>${teamTags([g.h])}<span class="lk-meta">vs ${esc(oppCoach)}</span></div>
+      <div class="lk-game-st">${status}${actions}</div>
+      <form class="lk-row lk-propose" data-propose="${key}" novalidate>
+        <label class="sr" for="when-${key}">Date and time</label><input type="datetime-local" id="when-${key}">
+        <label class="sr" for="note-${key}">Note</label><input id="note-${key}" maxlength="200" placeholder="Note (optional)">
+        <button type="submit" class="btn">${gt?'Propose new time':'Propose time'}</button>
+      </form></div>`;}).join('');
+});
+$('games-list').addEventListener('submit',wrapErr(async e=>{
+  const f=e.target.closest('[data-propose]'); if(!f) return; e.preventDefault();
+  const key=f.dataset.propose, v=f.querySelector('input[type=datetime-local]').value;
+  if(!v){lkMsg('Pick a date and time first.','err');return;}
+  await api('/api/game-times',{method:'POST',body:{game:key,startsAt:new Date(v).toISOString(),note:f.querySelector('input:not([type])').value}});
+  lkMsg('Time proposed. Your opponent can confirm it in their Locker Room.','ok'); loadGames();}));
+$('games-list').addEventListener('click',wrapErr(async e=>{
+  const c=e.target.closest('[data-confirm]'), d=e.target.closest('[data-decline]');
+  if(c){await api('/api/game-times/confirm',{method:'POST',body:{game:c.dataset.confirm}});lkMsg('Game time confirmed. It’s on the public schedule now.','ok');loadGames();loadGameTimes();}
+  if(d){await api('/api/game-times/decline',{method:'POST',body:{game:d.dataset.decline}});lkMsg('Proposed time declined.','ok');loadGames();}
+}));
+
+// Members directory
+const loadPeople=wrapErr(async()=>{
+  const {members}=await api('/api/members');
+  $('people-list').innerHTML=members.map(m=>`<div class="lk-person">${avatarHtml(m,56)}<b>${esc(m.display)}</b><span class="lk-meta">@${esc(m.username)}${m.role==='admin'?' · Commissioner':''}</span>${teamTags(m.teams)}</div>`).join('')||'<p class="none">No members yet.</p>';
+});
+
+// Commissioner tools
+const teamOptions=sel=>'<option value="">No team</option>'+[...TEAMS].sort((a,b)=>a.full.localeCompare(b.full)).map(t=>`<option value="${t.ab}"${t.ab===sel?' selected':''}>${t.full}</option>`).join('');
+const loadAdmin=wrapErr(async()=>{
+  const {members,invites}=await api('/api/admin/members');
+  const pend=members.filter(m=>m.status==='pending');
+  const noteam=members.filter(m=>m.status==='approved'&&!m.teams.length);
+  $('adm-noteam').innerHTML=noteam.length?noteam.map(m=>`<div class="lk-person row">${avatarHtml(m,40)}<span><b>${esc(m.display)}</b><span class="lk-meta">@${esc(m.username)}</span></span>
+    <label class="sr" for="nt-${m.id}">Team</label><select id="nt-${m.id}" data-team="${m.id}">${teamOptions('')}</select></div>`).join(''):'<p class="none">Every member has a team.</p>';
+  $('adm-pending').innerHTML=pend.length?pend.map(m=>`<div class="lk-person row">${avatarHtml(m,40)}<span><b>${esc(m.display)}</b><span class="lk-meta">@${esc(m.username)} · signed in ${ago(m.lastLogin)}</span></span>
+    <label class="sr" for="pt-${m.id}">Team</label><select id="pt-${m.id}">${teamOptions('')}</select>
+    <button type="button" class="btn ok" data-approve="${m.id}">Approve</button><button type="button" class="btn danger" data-remove="${m.id}">Deny</button></div>`).join(''):'<p class="none">Nobody is waiting.</p>';
+  $('adm-invites').innerHTML=invites.length?invites.map(i=>`<span class="lk-chip">@${esc(i.username)} <button type="button" aria-label="Remove ${esc(i.username)}" data-uninvite="${esc(i.username)}">×</button></span>`).join(''):'<span class="lk-hint">Add a coach’s Discord username and they’re let in the first time they sign in.</span>';
+  $('adm-members').innerHTML=members.filter(m=>m.status!=='pending').map(m=>`<tr data-mid="${m.id}"><td><span class="lk-mcell">${avatarHtml(m,30)}<span><b>${esc(m.display)}</b><span class="lk-meta">@${esc(m.username)}${m.status==='removed'?' · removed':''}</span></span></span></td>
+    <td><label class="sr" for="mt-${m.id}">Team</label><select id="mt-${m.id}" data-team="${m.id}">${teamOptions(m.teams[0]||'')}</select></td>
+    <td><label class="sr" for="mr-${m.id}">Role</label><select id="mr-${m.id}" data-role="${m.id}"${m.id===LK.me.id?' disabled':''}><option value="member"${m.role==='member'?' selected':''}>Member</option><option value="admin"${m.role==='admin'?' selected':''}>Commissioner</option></select></td>
+    <td>${m.lastLogin?ago(m.lastLogin):'—'}</td>
+    <td>${m.id===LK.me.id?'':m.status==='removed'?`<button type="button" class="btn ok" data-approve="${m.id}">Restore</button>`:`<button type="button" class="btn danger" data-remove="${m.id}">Remove</button>`}</td></tr>`).join('');
+});
+const adminSet=async(id,body,msg)=>{await api('/api/admin/members/'+id,{method:'POST',body});lkMsg(msg,'ok');
+  if(id===LK.me.id){LK.me=(await api('/api/me')).member;$('lk-teams').innerHTML=LK.me.teams.length?teamTags(LK.me.teams):'<span class="lk-hint">No team assigned yet</span>';}
+  loadAdmin();};
+$('view-locker').addEventListener('click',wrapErr(async e=>{
+  const a=e.target.closest('[data-approve]'), r=e.target.closest('[data-remove]'), u=e.target.closest('[data-uninvite]');
+  if(a){const sel=document.getElementById('pt-'+a.dataset.approve)||document.getElementById('mt-'+a.dataset.approve);
+    await adminSet(a.dataset.approve,{status:'approved',...(sel&&sel.value?{teams:[sel.value]}:{})},'Member approved.');}
+  if(r){if(r.dataset.sure!=='1'){r.dataset.sure='1';r.textContent='Confirm';return;} await adminSet(r.dataset.remove,{status:'removed'},'Member removed and signed out.');}
+  if(u){await api('/api/admin/invites/'+encodeURIComponent(u.dataset.uninvite),{method:'DELETE'});loadAdmin();}
+}));
+$('view-locker').addEventListener('change',wrapErr(async e=>{
+  const t=e.target.closest('[data-team]'), r=e.target.closest('[data-role]');
+  if(t) await adminSet(t.dataset.team,{teams:t.value?[t.value]:[]},'Team updated.');
+  if(r) await adminSet(r.dataset.role,{role:r.value},'Role updated.');
+}));
+$('inv-form').addEventListener('submit',wrapErr(async e=>{e.preventDefault();
+  const u=$('inv-user').value.trim(); if(!u) return;
+  await api('/api/admin/invites',{method:'POST',body:{username:u}}); $('inv-form').reset(); lkMsg('Pre-approved @'+u.replace(/^@/,'')+'.','ok'); loadAdmin();}));
+
+// Sign in / out
+$('lk-signin').addEventListener('click',e=>{e.preventDefault(); if(API_BASE) location.href=API_BASE.replace(/\/$/,'')+'/auth/discord/login';});
+document.querySelectorAll('[data-signout]').forEach(b=>b.addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST'});}catch(_){} tokSet(null);LK.me=null;LK.thread=null;showLocker();}));
+const LOGIN_ERRORS={cancelled:'Sign-in was cancelled.',expired:'That sign-in took too long. Please try again.',discord:'Discord didn’t respond. Please try again.',missing:'Sign-in didn’t finish. Please try again.'};
+$('lk-recheck').addEventListener('click',()=>{ if(LK.me&&LK.me.gate&&API_BASE) location.href=API_BASE.replace(/\/$/,'')+'/auth/discord/login'; else loadMe(); });
+window.initLocker=async function(h){
+  if(h&&h.startsWith('login=')){
+    const code=h.slice(6);
+    try{history.replaceState(null,'','#locker');}catch(_){}
+    try{const r=await api('/api/session',{method:'POST',body:{code}});tokSet(r.token);LK.me=r.member;showLocker();return;}
+    catch(e){$('lk-out-msg').textContent=e.message;}
+  } else if(h&&h.startsWith('login-error=')){
+    try{history.replaceState(null,'','#locker');}catch(_){}
+    $('lk-out-msg').textContent=LOGIN_ERRORS[decodeURIComponent(h.slice(12))]||'Sign-in didn’t finish. Please try again.';
+  }
+  if(!LK.inited||!LK.me||LK.me.status!=='approved'){LK.inited=true; await loadMe();} else showLocker();
+};
+// League Discord settings (invite link, whether server membership is required)
+function loadConfig(){
+  if(!API_BASE) return;
+  fetch(API_BASE.replace(/\/$/,'')+'/api/config').then(r=>r.ok?r.json():null).then(c=>{ if(!c) return;
+    if(c.discordInvite) document.querySelectorAll('[data-discord-link]').forEach(a=>{a.href=c.discordInvite;a.hidden=false;});
+    if(c.discordServerAccess) $('lk-out-text').textContent=c.coachRoleRequired?'Use your Discord account. Coaches in the RNN Discord server with the Coach role get straight in.':'Use your Discord account. Members of the RNN Discord server get straight in.';
+  }).catch(()=>{});
+}
+loadConfig();
+// Confirmed game times for the public schedule
+function loadGameTimes(){
+  if(!API_BASE) return;
+  fetch(API_BASE.replace(/\/$/,'')+'/api/game-times/public').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.games){window.GAME_TIMES=d.games; if(S.inited) renderGames();}}).catch(()=>{});
+}
+loadGameTimes();
 
 /* ================= FAN POLL ================= */
 const P={db:null,me:null,poll:null,votes:{},unsubVotes:null};

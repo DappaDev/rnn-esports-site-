@@ -17,6 +17,8 @@
  *   GET /api/league   -> teams, standings, games and stat leaders (public, cached ~60s)
  *   GET /api/health   -> ok + last export time
  *   GET /<EXPORT_KEY>/debug -> what was received and the field names in each export type
+ *
+ * The members area (Discord sign-in) is further down: see MEMBERS AREA.
  */
 
 const MAX_BODY = 25 * 1024 * 1024; // 25 MB
@@ -33,7 +35,9 @@ const SCHEMA = [
 let schemaReady = false;
 async function ensureSchema(db) {
   if (schemaReady) return;
-  await db.batch(SCHEMA.map((s) => db.prepare(s)));
+  await db.batch([...SCHEMA, ...MEMBER_SCHEMA].map((s) => db.prepare(s)));
+  const cols = (await db.prepare(`PRAGMA table_info(members)`).all()).results.map((c) => c.name);
+  for (const a of MEMBER_ALTERS) { const col = a.split("ADD COLUMN ")[1].split(" ")[0]; if (!cols.includes(col)) await db.prepare(a).run(); }
   schemaReady = true;
 }
 
@@ -201,19 +205,437 @@ async function buildLeague(db) {
   };
 }
 
+/* =====================================================================
+ * MEMBERS AREA (the Locker Room)
+ * Discord sign-in, approved members only.
+ *
+ * Settings on the Worker:
+ *   DISCORD_CLIENT_ID      (variable)  from the Discord Developer Portal
+ *   DISCORD_CLIENT_SECRET  (secret)    from the Discord Developer Portal
+ *   SITE_URL               (variable)  e.g. https://dappadev.github.io/rnn-esports-site-/
+ *   COMMISSIONERS          (variable)  Discord usernames with full control, comma-separated
+ * Optional, to tie access to the league's Discord server:
+ *   DISCORD_GUILD_ID         (variable)  the RNN server's ID: only server members get in
+ *   DISCORD_COACH_ROLE_ID    (variable)  if set, members also need this role (e.g. @Coach)
+ *   DISCORD_COMMISH_ROLE_ID  (variable)  members with this role are site commissioners
+ *   DISCORD_INVITE_URL       (variable)  invite link shown on the site
+ *   WEBHOOK_ANNOUNCEMENTS    (secret)    channel webhook: site announcements are posted here
+ *   WEBHOOK_SCHEDULE         (secret)    channel webhook: confirmed game times are posted here
+ *   WEBHOOK_SIGNUPS          (secret)    channel webhook: new Locker Room sign-ins are posted here
+ * ===================================================================== */
+
+const MEMBER_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, username TEXT, display TEXT, avatar TEXT, status TEXT, role TEXT, teams TEXT, created TEXT, last_login TEXT)`,
+  `CREATE TABLE IF NOT EXISTS invites (username TEXT PRIMARY KEY, added_by TEXT, created TEXT)`,
+  `CREATE TABLE IF NOT EXISTS oauth_states (state TEXT PRIMARY KEY, created INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS login_codes (code TEXT PRIMARY KEY, member_id TEXT, created INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, member_id TEXT, created INTEGER, expires INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS announcements (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, body TEXT, pinned INTEGER, author_id TEXT, created TEXT)`,
+  `CREATE TABLE IF NOT EXISTS threads (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, body TEXT, author_id TEXT, created TEXT, last_activity TEXT, reply_count INTEGER DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS replies (id INTEGER PRIMARY KEY AUTOINCREMENT, thread_id INTEGER, body TEXT, author_id TEXT, created TEXT)`,
+  `CREATE TABLE IF NOT EXISTS game_times (game_key TEXT PRIMARY KEY, status TEXT, starts_at TEXT, note TEXT, proposed_by TEXT, proposer_team TEXT, confirmed_by TEXT, updated TEXT)`,
+];
+
+const MEMBER_ALTERS = [
+  `ALTER TABLE members ADD COLUMN override TEXT`,   // 'approved' / 'removed' set by a commissioner on the site
+  `ALTER TABLE members ADD COLUMN role_site INTEGER`, // 1 when a commissioner set the role on the site
+  `ALTER TABLE members ADD COLUMN gate TEXT`,       // why Discord didn't let them in: not_in_server / no_role
+];
+const SESSION_DAYS = 14;
+const TEAM_NAMES = { ARI: "Cardinals", ATL: "Falcons", BAL: "Ravens", BUF: "Bills", CAR: "Panthers", CHI: "Bears", CIN: "Bengals", CLE: "Browns", DAL: "Cowboys", DEN: "Broncos", DET: "Lions", GB: "Packers", HOU: "Texans", IND: "Colts", JAX: "Jaguars", KC: "Chiefs", LV: "Raiders", LAC: "Chargers", LAR: "Rams", MIA: "Dolphins", MIN: "Vikings", NE: "Patriots", NO: "Saints", NYG: "Giants", NYJ: "Jets", PHI: "Eagles", PIT: "Steelers", SF: "49ers", SEA: "Seahawks", TB: "Buccaneers", TEN: "Titans", WAS: "Commanders" };
+
+// Post to a Discord channel webhook. Mentions are disabled so nothing pings @everyone.
+async function discordPost(url, embed) {
+  if (!url || !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(url)) return;
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: "RNN E-Sports", allowed_mentions: { parse: [] }, embeds: [embed] }) });
+    if (!res.ok) console.error("Discord post failed", res.status);
+  } catch (e) { console.error("Discord post failed", e && e.message); }
+}
+const siteLink = (env, hash) => env.SITE_URL ? env.SITE_URL.split("#")[0] + "#" + hash : undefined;
+function postGameTime(env, ctx, key, iso) {
+  const g = GAME_KEY.exec(key); if (!g) return;
+  const unix = Math.floor(new Date(iso).getTime() / 1000);
+  ctx.waitUntil(discordPost(env.WEBHOOK_SCHEDULE, {
+    title: `Week ${g[1]}: ${TEAM_NAMES[g[2]] || g[2]} @ ${TEAM_NAMES[g[3]] || g[3]}`,
+    description: `Game time confirmed: <t:${unix}:F> (<t:${unix}:R>)`, color: 0x8fc1e3, url: siteLink(env, "schedule"),
+  }));
+}
+const TEAM_ABBRS = new Set("ARI ATL BAL BUF CAR CHI CIN CLE DAL DEN DET GB HOU IND JAX KC LV LAC LAR MIA MIN NE NO NYG NYJ PHI PIT SF SEA TB TEN WAS".split(" "));
+const GAME_KEY = /^W([1-9]|1[0-8])-([A-Z]{2,3})@([A-Z]{2,3})$/;
+
+const randomToken = (bytes = 32) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+async function sha256(text) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+const clean = (v, max) => String(v ?? "").replace(/\u0000/g, "").trim().slice(0, max);
+const commissioners = (env) => String(env.COMMISSIONERS || "").toLowerCase().split(",").map((s) => s.trim().replace(/^@/, "")).filter(Boolean);
+const siteOrigin = (env) => { try { return new URL(env.SITE_URL).origin; } catch { return ""; } };
+
+function corsFor(request, env) {
+  const origin = request.headers.get("origin") || "";
+  const allowed = siteOrigin(env);
+  // Members endpoints only answer the league site (and local previews while testing).
+  const ok = origin && (origin === allowed || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
+  return ok ? {
+    "access-control-allow-origin": origin,
+    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+    "access-control-allow-headers": "authorization, content-type",
+    "access-control-max-age": "600",
+    vary: "origin",
+  } : { vary: "origin" };
+}
+
+const publicMember = (m) => m && ({
+  id: m.id, username: m.username, display: m.display || m.username, avatar: m.avatar,
+  status: m.status, role: m.role, teams: (m.teams || "").split(",").filter(Boolean), gate: m.gate || null,
+});
+
+async function currentMember(request, db) {
+  const auth = request.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  if (!token || token.length < 32) return null;
+  const s = await db.prepare(`SELECT member_id, expires FROM sessions WHERE token_hash = ?1`).bind(await sha256(token)).first();
+  if (!s || s.expires < Date.now()) return null;
+  return await db.prepare(`SELECT * FROM members WHERE id = ?1`).bind(s.member_id).first();
+}
+
+async function readJson(request) {
+  const t = await request.text();
+  if (t.length > 20000) throw new Error("too_large");
+  return t ? JSON.parse(t) : {};
+}
+
+async function handleAuth(request, env, url, segs, ctx) {
+  const db = env.DB;
+  if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET || !env.SITE_URL)
+    return json({ error: "Discord sign-in isn't set up yet. Add DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET and SITE_URL to the Worker." }, 500);
+  const redirectUri = url.origin + "/auth/discord/callback";
+
+  if (segs[2] === "login") {
+    const state = randomToken(16);
+    await db.prepare(`DELETE FROM oauth_states WHERE created < ?1`).bind(Date.now() - 600000).run();
+    await db.prepare(`INSERT INTO oauth_states VALUES (?1, ?2)`).bind(state, Date.now()).run();
+    const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, redirect_uri: redirectUri, response_type: "code", scope: env.DISCORD_GUILD_ID ? "identify guilds.members.read" : "identify", state, prompt: "none" });
+    return Response.redirect("https://discord.com/oauth2/authorize?" + q, 302);
+  }
+
+  if (segs[2] === "callback") {
+    const back = (msg) => Response.redirect(env.SITE_URL.split("#")[0] + "#login-error=" + encodeURIComponent(msg), 302);
+    const code = url.searchParams.get("code"), state = url.searchParams.get("state");
+    if (url.searchParams.get("error")) return back("cancelled");
+    if (!code || !state) return back("missing");
+    const st = await db.prepare(`SELECT created FROM oauth_states WHERE state = ?1`).bind(state).first();
+    await db.prepare(`DELETE FROM oauth_states WHERE state = ?1`).bind(state).run();
+    if (!st || st.created < Date.now() - 600000) return back("expired");
+
+    const tokRes = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, client_secret: env.DISCORD_CLIENT_SECRET, grant_type: "authorization_code", code, redirect_uri: redirectUri }),
+    });
+    if (!tokRes.ok) return back("discord");
+    const tok = await tokRes.json();
+    const meRes = await fetch("https://discord.com/api/users/@me", { headers: { authorization: `Bearer ${tok.access_token}` } });
+    if (!meRes.ok) return back("discord");
+    const du = await meRes.json();
+
+    const id = String(du.id), username = String(du.username || "").toLowerCase();
+    const display = du.global_name || du.username || "Coach";
+    const avatar = du.avatar ? `https://cdn.discordapp.com/avatars/${id}/${du.avatar}.png?size=128` : null;
+    const t = now();
+
+    // Discord server check (when DISCORD_GUILD_ID is set)
+    const guildMode = !!env.DISCORD_GUILD_ID;
+    let inServer = false, roles = [], serverNick = null;
+    if (guildMode) {
+      const gm = await fetch(`https://discord.com/api/users/@me/guilds/${env.DISCORD_GUILD_ID}/member`, { headers: { authorization: `Bearer ${tok.access_token}` } });
+      if (gm.ok) { const g = await gm.json(); inServer = true; roles = (g.roles || []).map(String); serverNick = g.nick || null; }
+      else if (gm.status !== 404) return back("discord");
+    }
+    const coachRole = String(env.DISCORD_COACH_ROLE_ID || "").trim(), commishRole = String(env.DISCORD_COMMISH_ROLE_ID || "").trim();
+    const hasCommishRole = inServer && !!commishRole && roles.includes(commishRole);
+    const isCommish = commissioners(env).includes(username) || hasCommishRole;
+    const passesDiscord = !guildMode || (inServer && (!coachRole || roles.includes(coachRole) || hasCommishRole));
+    const gate = !guildMode || isCommish || passesDiscord ? null : (!inServer ? "not_in_server" : "no_role");
+
+    const invited = await db.prepare(`SELECT username FROM invites WHERE username = ?1`).bind(username).first();
+    const existing = await db.prepare(`SELECT * FROM members WHERE id = ?1`).bind(id).first();
+    const override = existing?.override || (invited ? "approved" : null);
+    let status;
+    if (isCommish) status = "approved";
+    else if (override === "removed") status = "removed";
+    else if (override === "approved") status = "approved";
+    else if (guildMode) status = passesDiscord ? "approved" : "pending";
+    else status = existing?.status === "approved" ? "approved" : "pending";
+    let role = existing?.role || "member";
+    if (isCommish) role = "admin";
+    else if (role === "admin" && !existing?.role_site) role = "member"; // lost the Discord commissioner role
+    const name = serverNick || display;
+
+    if (existing) {
+      await db.prepare(`UPDATE members SET username=?2, display=?3, avatar=?4, status=?5, role=?6, last_login=?7, gate=?8, override=?9 WHERE id=?1`)
+        .bind(id, username, name, avatar, status, role, t, status === "approved" ? null : gate, override).run();
+    } else {
+      await db.prepare(`INSERT INTO members (id, username, display, avatar, status, role, teams, created, last_login, override, role_site, gate) VALUES (?1,?2,?3,?4,?5,?6,'',?7,?7,?8,0,?9)`)
+        .bind(id, username, name, avatar, status, role, t, override, status === "approved" ? null : gate).run();
+    }
+    // Let the commissioners' channel know about new arrivals.
+    const firstTime = !existing || (existing.status !== status && status !== "removed");
+    if (firstTime && !isCommish && status !== "removed") {
+      const why = gate === "not_in_server" ? "They aren't in the RNN Discord server yet." : gate === "no_role" ? "They don't have the Coach role yet." : null;
+      ctx.waitUntil(discordPost(env.WEBHOOK_SIGNUPS, status === "approved"
+        ? { title: `${name} joined the Locker Room`, description: `@${username} is in. Assign their team in Commissioner tools.`, color: 0xe8ff1a, url: siteLink(env, "locker") }
+        : { title: `${name} is waiting for approval`, description: `@${username} signed in to the Locker Room. ${why || "Approve them in Commissioner tools."}`, color: 0xa9b8c4, url: siteLink(env, "locker") }));
+    }
+    const loginCode = randomToken(24);
+    await db.prepare(`DELETE FROM login_codes WHERE created < ?1`).bind(Date.now() - 120000).run();
+    await db.prepare(`INSERT INTO login_codes VALUES (?1, ?2, ?3)`).bind(loginCode, id, Date.now()).run();
+    return Response.redirect(env.SITE_URL.split("#")[0] + "#login=" + loginCode, 302);
+  }
+  return json({ error: "Not found" }, 404);
+}
+
+async function handleMembersApi(request, env, segs, cors, ctx) {
+  const db = env.DB, M = request.method, t = now();
+  const ok = (o, s = 200) => json(o, s, cors);
+  const err = (msg, s = 400) => json({ error: msg }, s, cors);
+  const route = segs.slice(1); // after "api"
+
+  // Exchange the one-time login code for a session token.
+  if (route[0] === "session" && M === "POST") {
+    const { code } = await readJson(request);
+    if (!code || typeof code !== "string") return err("Missing sign-in code.");
+    const row = await db.prepare(`SELECT member_id, created FROM login_codes WHERE code = ?1`).bind(code).first();
+    await db.prepare(`DELETE FROM login_codes WHERE code = ?1`).bind(code).run();
+    if (!row || row.created < Date.now() - 120000) return err("That sign-in link expired. Please sign in again.", 401);
+    const token = randomToken(32);
+    await db.prepare(`INSERT INTO sessions VALUES (?1, ?2, ?3, ?4)`).bind(await sha256(token), row.member_id, Date.now(), Date.now() + SESSION_DAYS * 864e5).run();
+    const m = await db.prepare(`SELECT * FROM members WHERE id = ?1`).bind(row.member_id).first();
+    return ok({ token, member: publicMember(m) });
+  }
+
+  const me = await currentMember(request, db);
+  if (!me) return err("Please sign in.", 401);
+
+  if (route[0] === "me" && M === "GET") return ok({ member: publicMember(me) });
+  if (route[0] === "logout" && M === "POST") {
+    const token = (request.headers.get("authorization") || "").slice(7).trim();
+    await db.prepare(`DELETE FROM sessions WHERE token_hash = ?1`).bind(await sha256(token)).run();
+    return ok({ success: true });
+  }
+
+  if (me.status !== "approved") return err(me.status === "removed" ? "Your access was removed by the commissioner." : "Your account is waiting for the commissioner's approval.", 403);
+  const isAdmin = me.role === "admin";
+  const myTeams = (me.teams || "").split(",").filter(Boolean);
+  const authorMap = async (ids) => {
+    const uniq = [...new Set(ids.filter(Boolean))];
+    if (!uniq.length) return {};
+    const rows = await db.prepare(`SELECT id, display, username, avatar, teams FROM members WHERE id IN (${uniq.map((_, i) => "?" + (i + 1)).join(",")})`).bind(...uniq).all();
+    return Object.fromEntries(rows.results.map((r) => [r.id, { display: r.display || r.username, avatar: r.avatar, teams: (r.teams || "").split(",").filter(Boolean) }]));
+  };
+
+  // ---- Announcements ----
+  if (route[0] === "announcements") {
+    if (M === "GET") {
+      const r = await db.prepare(`SELECT * FROM announcements ORDER BY pinned DESC, id DESC LIMIT 50`).all();
+      const a = await authorMap(r.results.map((x) => x.author_id));
+      return ok({ announcements: r.results.map((x) => ({ id: x.id, title: x.title, body: x.body, pinned: !!x.pinned, created: x.created, author: a[x.author_id] || null })) });
+    }
+    if (!isAdmin) return err("Only the commissioner can do that.", 403);
+    if (M === "POST" && !route[1]) {
+      const b = await readJson(request);
+      const title = clean(b.title, 120), body = clean(b.body, 4000);
+      if (!title || !body) return err("Add a title and a message.");
+      const r = await db.prepare(`INSERT INTO announcements (title, body, pinned, author_id, created) VALUES (?1,?2,?3,?4,?5) RETURNING id`).bind(title, body, b.pinned ? 1 : 0, me.id, t).first();
+      if (b.discord !== false) ctx.waitUntil(discordPost(env.WEBHOOK_ANNOUNCEMENTS, { title, description: body, color: 0xe8ff1a, url: siteLink(env, "locker"), footer: { text: `Posted by ${me.display || me.username} on the RNN site` } }));
+      return ok({ id: r.id }, 201);
+    }
+    if (M === "DELETE" && route[1]) { await db.prepare(`DELETE FROM announcements WHERE id = ?1`).bind(+route[1]).run(); return ok({ success: true }); }
+  }
+
+  // ---- Message board ----
+  if (route[0] === "threads") {
+    if (M === "GET" && !route[1]) {
+      const r = await db.prepare(`SELECT id, title, author_id, created, last_activity, reply_count FROM threads ORDER BY last_activity DESC LIMIT 100`).all();
+      const a = await authorMap(r.results.map((x) => x.author_id));
+      return ok({ threads: r.results.map((x) => ({ ...x, author: a[x.author_id] || null })) });
+    }
+    if (M === "POST" && !route[1]) {
+      const b = await readJson(request);
+      const title = clean(b.title, 120), body = clean(b.body, 4000);
+      if (!title || !body) return err("Add a title and a message.");
+      const r = await db.prepare(`INSERT INTO threads (title, body, author_id, created, last_activity, reply_count) VALUES (?1,?2,?3,?4,?4,0) RETURNING id`).bind(title, body, me.id, t).first();
+      return ok({ id: r.id }, 201);
+    }
+    const tid = +route[1];
+    if (route[1] && M === "GET") {
+      const th = await db.prepare(`SELECT * FROM threads WHERE id = ?1`).bind(tid).first();
+      if (!th) return err("That thread was removed.", 404);
+      const rs = await db.prepare(`SELECT * FROM replies WHERE thread_id = ?1 ORDER BY id ASC LIMIT 500`).bind(tid).all();
+      const a = await authorMap([th.author_id, ...rs.results.map((x) => x.author_id)]);
+      return ok({
+        thread: { id: th.id, title: th.title, body: th.body, created: th.created, author: a[th.author_id] || null, mine: th.author_id === me.id },
+        replies: rs.results.map((x) => ({ id: x.id, body: x.body, created: x.created, author: a[x.author_id] || null, mine: x.author_id === me.id })),
+      });
+    }
+    if (route[1] && route[2] === "replies" && M === "POST") {
+      const th = await db.prepare(`SELECT id FROM threads WHERE id = ?1`).bind(tid).first();
+      if (!th) return err("That thread was removed.", 404);
+      const body = clean((await readJson(request)).body, 4000);
+      if (!body) return err("Write a reply first.");
+      await db.batch([
+        db.prepare(`INSERT INTO replies (thread_id, body, author_id, created) VALUES (?1,?2,?3,?4)`).bind(tid, body, me.id, t),
+        db.prepare(`UPDATE threads SET last_activity = ?2, reply_count = reply_count + 1 WHERE id = ?1`).bind(tid, t),
+      ]);
+      return ok({ success: true }, 201);
+    }
+    if (route[1] && M === "DELETE") {
+      const th = await db.prepare(`SELECT author_id FROM threads WHERE id = ?1`).bind(tid).first();
+      if (!th) return ok({ success: true });
+      if (th.author_id !== me.id && !isAdmin) return err("You can only delete your own posts.", 403);
+      await db.batch([db.prepare(`DELETE FROM replies WHERE thread_id = ?1`).bind(tid), db.prepare(`DELETE FROM threads WHERE id = ?1`).bind(tid)]);
+      return ok({ success: true });
+    }
+  }
+  if (route[0] === "replies" && route[1] && M === "DELETE") {
+    const r = await db.prepare(`SELECT author_id, thread_id FROM replies WHERE id = ?1`).bind(+route[1]).first();
+    if (!r) return ok({ success: true });
+    if (r.author_id !== me.id && !isAdmin) return err("You can only delete your own posts.", 403);
+    await db.batch([
+      db.prepare(`DELETE FROM replies WHERE id = ?1`).bind(+route[1]),
+      db.prepare(`UPDATE threads SET reply_count = MAX(reply_count - 1, 0) WHERE id = ?1`).bind(r.thread_id),
+    ]);
+    return ok({ success: true });
+  }
+
+  // ---- Members directory ----
+  if (route[0] === "members" && M === "GET") {
+    const r = await db.prepare(`SELECT * FROM members WHERE status = 'approved' ORDER BY display`).all();
+    return ok({ members: r.results.map((m) => { const p = publicMember(m); delete p.status; return p; }) });
+  }
+
+  // ---- Game scheduling ----
+  if (route[0] === "game-times") {
+    if (M === "GET" && !route[1]) {
+      const r = await db.prepare(`SELECT * FROM game_times`).all();
+      const a = await authorMap(r.results.flatMap((x) => [x.proposed_by, x.confirmed_by]));
+      return ok({ games: r.results.map((x) => ({ game: x.game_key, status: x.status, startsAt: x.starts_at, note: x.note, proposerTeam: x.proposer_team, proposedBy: a[x.proposed_by] || null, confirmedBy: a[x.confirmed_by] || null, updated: x.updated, mine: x.proposed_by === me.id })) });
+    }
+    const b = M === "POST" ? await readJson(request) : {};
+    const key = String(b.game || "");
+    const g = GAME_KEY.exec(key);
+    if (!g || !TEAM_ABBRS.has(g[2]) || !TEAM_ABBRS.has(g[3])) return err("Unknown game.");
+    const sides = [g[2], g[3]];
+    const mySide = myTeams.find((x) => sides.includes(x));
+    if (!mySide && !isAdmin) return err("Only the two coaches in this game can schedule it.", 403);
+    const cur = await db.prepare(`SELECT * FROM game_times WHERE game_key = ?1`).bind(key).first();
+
+    if (!route[1] && M === "POST") { // propose (or admin sets directly)
+      const when = new Date(String(b.startsAt || ""));
+      if (isNaN(when)) return err("Pick a date and time.");
+      const note = clean(b.note, 200);
+      const direct = isAdmin && b.confirm === true;
+      await db.prepare(`INSERT INTO game_times VALUES (?1,?2,?3,?4,?5,?6,?7,?8)
+        ON CONFLICT(game_key) DO UPDATE SET status=?2, starts_at=?3, note=?4, proposed_by=?5, proposer_team=?6, confirmed_by=?7, updated=?8`)
+        .bind(key, direct ? "confirmed" : "proposed", when.toISOString(), note, me.id, mySide || "", direct ? me.id : null, t).run();
+      if (direct) postGameTime(env, ctx, key, when.toISOString());
+      return ok({ success: true, status: direct ? "confirmed" : "proposed" }, 201);
+    }
+    if (route[1] === "confirm" && M === "POST") {
+      if (!cur || cur.status !== "proposed") return err("There's no proposed time to confirm.");
+      if (!isAdmin && (cur.proposed_by === me.id || mySide === cur.proposer_team)) return err("Your opponent has to confirm this time.", 403);
+      await db.prepare(`UPDATE game_times SET status='confirmed', confirmed_by=?2, updated=?3 WHERE game_key=?1`).bind(key, me.id, t).run();
+      postGameTime(env, ctx, key, cur.starts_at);
+      return ok({ success: true });
+    }
+    if (route[1] === "decline" && M === "POST") {
+      if (!cur) return ok({ success: true });
+      await db.prepare(`DELETE FROM game_times WHERE game_key = ?1`).bind(key).run();
+      return ok({ success: true });
+    }
+  }
+
+  // ---- Commissioner tools ----
+  if (route[0] === "admin") {
+    if (!isAdmin) return err("Only the commissioner can do that.", 403);
+    if (route[1] === "members" && M === "GET") {
+      const r = await db.prepare(`SELECT * FROM members ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, display`).all();
+      const inv = await db.prepare(`SELECT username, created FROM invites ORDER BY username`).all();
+      return ok({ members: r.results.map((m) => ({ ...publicMember(m), lastLogin: m.last_login, created: m.created })), invites: inv.results });
+    }
+    if (route[1] === "members" && route[2] && M === "POST") {
+      const b = await readJson(request);
+      const m = await db.prepare(`SELECT * FROM members WHERE id = ?1`).bind(route[2]).first();
+      if (!m) return err("Member not found.", 404);
+      const status = ["pending", "approved", "removed"].includes(b.status) ? b.status : m.status;
+      let role = ["member", "admin"].includes(b.role) ? b.role : m.role;
+      if (m.id === me.id) role = "admin"; // you can't demote yourself by accident
+      const teams = Array.isArray(b.teams) ? b.teams.map((x) => String(x).toUpperCase()).filter((x) => TEAM_ABBRS.has(x)).slice(0, 2).join(",") : m.teams;
+      const newStatus = m.id === me.id ? "approved" : status;
+      const override = newStatus === m.status ? m.override : newStatus === "pending" ? null : newStatus;
+      const roleSite = ["member", "admin"].includes(b.role) && b.role !== m.role ? 1 : m.role_site;
+      await db.prepare(`UPDATE members SET status=?2, role=?3, teams=?4, override=?5, role_site=?6, gate=CASE WHEN ?2='approved' THEN NULL ELSE gate END WHERE id=?1`).bind(m.id, newStatus, role, teams, override, roleSite || 0).run();
+      if (status === "removed" && m.id !== me.id) await db.prepare(`DELETE FROM sessions WHERE member_id = ?1`).bind(m.id).run();
+      return ok({ success: true });
+    }
+    if (route[1] === "invites" && M === "POST") {
+      const u = clean((await readJson(request)).username, 40).toLowerCase().replace(/^@/, "");
+      if (!/^[a-z0-9_.]{2,32}$/.test(u)) return err("Enter a Discord username (letters, numbers, _ and . only).");
+      await db.prepare(`INSERT OR IGNORE INTO invites VALUES (?1,?2,?3)`).bind(u, me.id, t).run();
+      await db.prepare(`UPDATE members SET status='approved', override='approved', gate=NULL WHERE username = ?1 AND status = 'pending'`).bind(u).run();
+      return ok({ success: true }, 201);
+    }
+    if (route[1] === "invites" && route[2] && M === "DELETE") {
+      await db.prepare(`DELETE FROM invites WHERE username = ?1`).bind(decodeURIComponent(route[2]).toLowerCase()).run();
+      return ok({ success: true });
+    }
+  }
+  return err("Not found", 404);
+}
+
+// Confirmed game times are public, so the schedule can show them.
+async function publicGameTimes(db) {
+  const r = await db.prepare(`SELECT game_key, starts_at FROM game_times WHERE status = 'confirmed'`).all();
+  return Object.fromEntries(r.results.map((x) => [x.game_key, x.starts_at]));
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const segs = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
 
-    if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
+    const isPublicApi = segs[0] === "api" && (segs[1] === "health" || segs[1] === "league" || segs[1] === "config" || (segs[1] === "game-times" && segs[2] === "public"));
+    const isMembersApi = segs[0] === "api" && !isPublicApi;
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: isMembersApi ? corsFor(request, env) : CORS });
     if (!env.DB) return json({ error: "The D1 database is not connected. Add a D1 binding named DB." }, 500, CORS);
     await ensureSchema(env.DB);
+
+    if (segs[0] === "auth" && segs[1] === "discord") return handleAuth(request, env, url, segs, ctx);
+
+    if (isMembersApi) {
+      const cors = corsFor(request, env);
+      try { return await handleMembersApi(request, env, segs, cors, ctx); }
+      catch (e) {
+        if (e instanceof SyntaxError || (e && e.message === "too_large")) return json({ error: "That request couldn't be read." }, 400, cors);
+        console.error("Members API error", e && e.message);
+        return json({ error: "Something went wrong. Please try again." }, 500, cors);
+      }
+    }
 
     if (request.method === "GET" && segs[0] === "api") {
       if (segs[1] === "health") {
         const m = await env.DB.prepare(`SELECT MAX(received) AS last FROM exports`).first();
-        return json({ ok: true, lastExport: m?.last ?? null }, 200, CORS);
+        return json({ ok: true, lastExport: m?.last ?? null, members: !!(env.DISCORD_CLIENT_ID && env.SITE_URL) }, 200, CORS);
+      }
+      if (segs[1] === "config") {
+        const invite = /^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]+$/.test(env.DISCORD_INVITE_URL || "") ? env.DISCORD_INVITE_URL : null;
+        return json({ discordInvite: invite, discordServerAccess: !!env.DISCORD_GUILD_ID, coachRoleRequired: !!env.DISCORD_COACH_ROLE_ID }, 200, { ...CORS, "cache-control": "public, max-age=300" });
+      }
+      if (segs[1] === "game-times") {
+        return json({ games: await publicGameTimes(env.DB) }, 200, { ...CORS, "cache-control": "public, max-age=30" });
       }
       if (segs[1] === "league") {
         const cache = caches.default;
@@ -224,7 +646,10 @@ export default {
         ctx.waitUntil(cache.put(cacheKey, res.clone()));
         return res;
       }
-      return json({ error: "Not found" }, 404, CORS);
+    }
+
+    if (request.method === "GET" && segs.length === 0) {
+      return new Response("RNN E-Sports league data receiver is running.", { headers: { "content-type": "text/plain" } });
     }
 
     const key = env.EXPORT_KEY;
@@ -248,9 +673,6 @@ export default {
       }
     }
 
-    if (request.method === "GET" && segs.length === 0) {
-      return new Response("RNN E-Sports league data receiver is running.", { headers: { "content-type": "text/plain" } });
-    }
     return json({ error: "Not found" }, 404);
   },
 };

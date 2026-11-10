@@ -1,4 +1,4 @@
-# RNN League Data Receiver
+# RNN League Data Receiver + Locker Room
 
 This receives the **Madden 27 Companion App franchise export** and feeds the site's **Scores & Stats** page and the final scores on the **Schedule** page.
 
@@ -50,6 +50,90 @@ const API_BASE='';
 
 For example, `const API_BASE='https://rnn-receiver.yourname.workers.dev';`. Commit and push, or ask Claude to do it.
 
+## Locker Room (members area) setup, about 10 minutes
+
+The Locker Room uses **Sign in with Discord**. Only coaches you approve get in.
+
+### A. Create the Discord app
+1. Go to **discord.com/developers/applications** and sign in with your Discord account.
+2. Click **New Application**, name it `RNN E-Sports`, accept the terms and click **Create**.
+3. In the left menu, open **OAuth2**.
+4. Copy the **Client ID**.
+5. Under **Client Secret**, click **Reset Secret**, then copy the secret. Keep it private.
+6. Under **Redirects**, click **Add Redirect** and paste:
+   ```
+   https://rnn-receiver.dtorregano.workers.dev/auth/discord/callback
+   ```
+   Then click **Save Changes**.
+
+### B. Add four settings to the Worker
+In Cloudflare, open **Workers & Pages → rnn-receiver → Settings → Variables and Secrets** and add:
+
+| Type | Name | Value |
+|---|---|---|
+| Text | `DISCORD_CLIENT_ID` | the Client ID from step A4 |
+| **Secret** | `DISCORD_CLIENT_SECRET` | the Client Secret from step A5 |
+| Text | `SITE_URL` | `https://dappadev.github.io/rnn-esports-site-/` |
+| Text | `COMMISSIONERS` | your Discord username (add more, separated by commas) |
+
+Click **Deploy**.
+
+### B2. Connect your league's Discord server (recommended)
+This lets your Discord server decide who gets in: anyone in the server with the **@Coach** role gets straight into the Locker Room, and **@Commissioner** makes someone a site commissioner. It also posts to your channels automatically.
+
+1. **Turn on Developer Mode** in Discord: **User Settings → Advanced → Developer Mode**. This adds "Copy ID" to right-click menus.
+2. **Server ID:** right-click your server's icon → **Copy Server ID**.
+3. **Roles:** in **Server Settings → Roles**, create **Coach** and **Commissioner** roles if you don't have them. Right-click each one → **Copy Role ID**. Give the Coach role to every league coach.
+4. **Invite link:** right-click the server → **Invite People** → **Edit invite link** → set it to **Never** expire → copy the link.
+5. **Channel webhooks:** for each channel below, open **Edit Channel (gear) → Integrations → Webhooks → New Webhook → Copy Webhook URL**.
+   - your announcements channel (for site announcements)
+   - a schedule channel (for confirmed game times)
+   - a private commissioners channel (for new Locker Room sign-ins)
+
+**RNN values** (already set up; these aren't secret). The RNN E-Sports Discord app exists, and its redirect is saved:
+
+| Name | Value |
+|---|---|
+| `DISCORD_CLIENT_ID` | `1569494857737572463` (RNN E-Sports app) |
+| `DISCORD_GUILD_ID` | `1337105795229155330` |
+| `DISCORD_COACH_ROLE_ID` | `1569491428697051136` (Coach) |
+| `DISCORD_COMMISH_ROLE_ID` | `1569491480547164201` (Commissioner) |
+
+Then add these to the Worker (**Settings → Variables and Secrets**):
+
+| Type | Name | Value |
+|---|---|---|
+| Text | `DISCORD_GUILD_ID` | Server ID |
+| Text | `DISCORD_COACH_ROLE_ID` | Coach role ID |
+| Text | `DISCORD_COMMISH_ROLE_ID` | Commissioner role ID |
+| Text | `DISCORD_INVITE_URL` | the invite link |
+| **Secret** | `WEBHOOK_ANNOUNCEMENTS` | announcements channel webhook |
+| **Secret** | `WEBHOOK_SCHEDULE` | schedule channel webhook |
+| **Secret** | `WEBHOOK_SIGNUPS` | commissioners channel webhook |
+
+Each one is optional. Leave out the role IDs to let anyone in the server in, or leave out a webhook to skip that channel. Keep the webhook URLs private: anyone with one can post to that channel.
+
+**How it behaves:**
+- Discord roles are checked each time someone signs in. Sign-ins last 14 days, so role changes take effect at the next sign-in. To cut someone off right away, remove them in **Commissioner** tools on the site.
+- What you do on the site wins. If you approve someone there, they stay in even without the role. If you remove them, they stay out even with it.
+- Discord posts never ping anyone (@everyone and @here are disabled).
+
+### C. Update the Worker code
+Open **rnn-receiver → Edit code**, replace everything with the new `worker.js` from this folder, and click **Deploy**. The database tables create themselves on first use.
+
+### D. Try it
+1. On the league site, open **Locker Room** and click **Sign in with Discord**. Commissioners get straight in.
+2. With the Discord server connected, coaches with the Coach role get straight in and appear under **Commissioner → Needs a team**. Pick their team there. Anyone else waits under **Waiting for approval**.
+3. Or pre-approve coaches by Discord username, and they get straight in the first time they sign in.
+
+### What members can do
+- **Announcements:** read the commissioner's posts. Only commissioners can post, pin and delete.
+- **Message Board:** start threads and reply. Members can delete their own posts, and commissioners can delete any.
+- **My Games:** propose a date and time for each of their team's games. The opponent confirms or declines, and confirmed times replace "TBD" on the public schedule.
+- **Members:** a directory of approved coaches.
+
+Removing a member signs them out everywhere right away.
+
 ## Addresses
 
 | Address | What it's for |
@@ -58,6 +142,9 @@ For example, `const API_BASE='https://rnn-receiver.yourname.workers.dev';`. Comm
 | `/api/league` | Public data the website reads: teams, standings, games and stat leaders. Cached for 60 seconds. |
 | `/api/health` | Quick check that shows the last export time |
 | `/<EXPORT_KEY>/debug` | Private: lists each export received, its item count and field names |
+| `/auth/discord/login` | Starts Discord sign-in for the Locker Room |
+| `/api/game-times/public` | Public: confirmed game times shown on the schedule |
+| `/api/...` (other) | Locker Room data. Signed-in, approved members only, and only from the league site |
 
 ## Notes
 - If an export fails in the app (EA's servers are sometimes busy), just try again.

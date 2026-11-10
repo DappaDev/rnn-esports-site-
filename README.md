@@ -11,6 +11,7 @@ The site is a single page (`index.html`) with four views:
 | Home | `index.html` | On Air broadcast panel, fan poll, and the coach roster |
 | Schedule | `index.html#schedule` | All 18 weeks and 272 games of the 2026–27 season, dates and kickoffs TBD |
 | Scores & Stats | `index.html#league` | Standings, final scores and stat leaders from Madden Companion App exports |
+| Locker Room | `index.html#locker` | Members only: announcements, message board and game scheduling, with Discord sign-in |
 | Join the League | `index.html#join` | Draft board of open teams and the coach sign-up form |
 | Coach card | `index.html#coach-<name>` | A coach's full broadcast profile card |
 
@@ -20,7 +21,7 @@ The site is a single page (`index.html`) with four views:
 - `coaches/` – coach broadcast profile cards
 - `logos/` – team logos, one per team abbreviation (e.g. `KC.png`)
 - `data/schedule-2026-27.txt` – the season schedule as plain text (`W1 AWAY@HOME`)
-- `receiver/` – the Madden export receiver (Cloudflare Worker) with its setup guide
+- `receiver/` – the Cloudflare Worker: Madden export receiver and Locker Room backend, with setup guides
 
 ## Updating
 
