@@ -698,6 +698,38 @@ html,body{overflow-x:clip}
 .clip-row b{font-family:var(--f-cond);font-weight:800;font-size:17px;overflow-wrap:anywhere}
 .clip-st{justify-self:start;font-family:var(--f-cond);font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:3px;background:var(--navy-600)}
 .clip-st.approved{background:var(--neon);color:var(--ink)}.clip-st.rejected{background:#5a2124;color:#ffb3b5}
+
+/* ================= TEAM COLOURS ================= */
+/* coach cards: frame in the coach's colour, name plate in the team's colours */
+.card{border-color:var(--team)}
+.card .meta{background:linear-gradient(105deg,var(--c1) 0 72%,color-mix(in srgb,var(--c1) 75%,#000) 72%);color:var(--on);border-top:6px solid var(--c2)}
+.card .team{color:var(--on);opacity:.85}
+.card:nth-child(4n+1){box-shadow:7px 7px 0 color-mix(in srgb,var(--c2) 55%,var(--ink))}
+.card:hover{border-color:var(--team);box-shadow:12px 12px 0 var(--c2)}
+.dlg-body{background:linear-gradient(105deg,var(--c1,var(--navy-800)) 0 70%,color-mix(in srgb,var(--c1,var(--navy-800)) 75%,#000) 70%);border-top-color:var(--c2,var(--team));color:var(--on,var(--ice))}
+.dlg-body p,.dlg-body .pos{color:var(--on,var(--ice-dim));opacity:.85}
+/* schedule: each side glows in its team's colour */
+.game.tc{background:linear-gradient(90deg,color-mix(in srgb,var(--ca) 30%,var(--navy-800)) 0,var(--navy-800) 40%,var(--navy-800) 60%,color-mix(in srgb,var(--ch) 30%,var(--navy-800)) 100%)}
+.game.tc.show{background:linear-gradient(90deg,color-mix(in srgb,var(--ca) 34%,var(--navy-800)) 0,color-mix(in srgb,#E8FF1A 8%,var(--navy-800)) 40%,color-mix(in srgb,#E8FF1A 8%,var(--navy-800)) 60%,color-mix(in srgb,var(--ch) 34%,var(--navy-800)) 100%)}
+.side-t .chip[style]{box-shadow:0 0 0 3px var(--tc)}
+/* section headings: spray paint in league teams' colours */
+#on-air h2::before{background:#FB4F14;opacity:.55}
+#highlights h2::before{background:#69BE28;opacity:.5}
+#talk h2::before{background:#9B5CFF;opacity:.55}
+#coaches h2::before{background:#C8102E;opacity:.55}
+#on-air .sub{color:#ffab85}#highlights .sub{color:#a6e27c}#talk .sub{color:#c7a8ff}#coaches .sub{color:#ff8a98}
+/* masthead numbers + ticker stars */
+.facts div:nth-child(1) b{color:#FB4F14}.facts div:nth-child(2) b{color:#69BE28}.facts div:nth-child(3) b{color:#4B92DB}
+.ticker i:nth-of-type(4n+1){color:#C8102E}.ticker i:nth-of-type(4n+2){color:#4F2683}.ticker i:nth-of-type(4n+3){color:#006778}.ticker i:nth-of-type(4n){color:#FB4F14}
+/* countdown in the two teams' colours when it's counting down to a game */
+.countdown.teams{border-color:var(--cda);box-shadow:6px 6px 0 var(--cdb)}
+.countdown.teams .cd-label,.countdown.teams .cd-clock b{color:var(--cda)}
+.countdown.teams .cd-clock span:nth-child(even) b{color:var(--cdb)}
+/* trash talk: coaches post in their team colours */
+.tk.tk-team{border-left:6px solid var(--tc);box-shadow:4px 4px 0 color-mix(in srgb,var(--tc) 45%,var(--ink))}
+.tk-badge.tbadge{background:var(--c1);color:var(--on);box-shadow:inset 0 -2px 0 var(--c2)}
+/* highlight cards: a little colour on hover */
+.hl:nth-child(4n+1):hover{box-shadow:8px 8px 0 #FB4F14}.hl:nth-child(4n+2):hover{box-shadow:8px 8px 0 #69BE28}.hl:nth-child(4n+3):hover{box-shadow:8px 8px 0 #9B5CFF}.hl:nth-child(4n):hover{box-shadow:8px 8px 0 #4B92DB}
 </style>
 </head>
 <body>
@@ -1204,7 +1236,7 @@ function render(f){
   const list=COACHES.filter(c=>f==='ALL'||c.conf===f);
   shown=list;
   grid.innerHTML=list.map(c=>`
-    <button type="button" class="card" style="--team:${c.color}" data-id="${c.id}" aria-label="${c.name}, ${c.team}">
+    <button type="button" class="card" style="--team:${c.color};--c1:${teamOfCoach(c)?.c1||c.color};--c2:${teamOfCoach(c)?.c2||c.color};--on:${textOn(teamOfCoach(c)?.c1||c.color)}" data-id="${c.id}" aria-label="${c.name}, ${c.team}">
       <div class="pic"><img src="coaches/${c.id}.jpg" alt="" loading="lazy" width="1200" height="1006"></div>
       <div class="meta">
         <div><div class="name">${c.name}</div><div class="team">${c.team}</div></div>
@@ -1221,6 +1253,7 @@ const dlg=document.getElementById('dlg');
 function openCoach(id){
   const c=COACHES.find(x=>x.id===id); if(!c) return;
   dlg.style.setProperty('--team',c.color);
+  {const t=teamOfCoach(c); if(t){dlg.style.setProperty('--c1',t.c1);dlg.style.setProperty('--c2',t.c2);dlg.style.setProperty('--on',textOn(t.c1));}}
   document.getElementById('dlg-img').src=`coaches/${c.id}.jpg`;
   document.getElementById('dlg-img').alt=`${c.name} broadcast profile card, ${c.team}`;
   document.getElementById('dlg-name').textContent=c.name;
@@ -1447,6 +1480,15 @@ window.initJoin=async function(){
 const SCHED={1: "NE@SEA SF@LAR CHI@CAR TB@CIN BAL@IND NO@DET BUF@HOU CLE@JAX NYJ@TEN ATL@PIT GB@MIN WAS@PHI MIA@LV ARI@LAC DAL@NYG DEN@KC", 2: "DET@BUF CAR@ATL MIN@CHI CIN@HOU PIT@NE GB@NYJ PHI@TEN NO@BAL CLE@TB JAX@DEN LV@LAC SEA@ARI WAS@DAL MIA@SF IND@KC NYG@LAR", 3: "ATL@GB LAC@BUF CAR@CLE HOU@IND NYJ@DET NE@JAX KC@MIA TEN@NYG CIN@PIT SEA@WAS ARI@SF MIN@TB BAL@DAL LV@NO LAR@DEN PHI@CHI", 4: "PIT@CLE IND@WAS NE@BUF NYJ@CHI JAX@CIN DAL@HOU ARI@NYG LAR@PHI TEN@BAL GB@TB MIA@MIN KC@LV LAC@SEA DEN@SF DET@CAR ATL@NO", 5: "TB@DAL PHI@JAX CIN@MIA MIN@NO LV@NE CLE@NYJ HOU@TEN IND@PIT NYG@WAS DEN@LAC DET@ARI CHI@GB SF@SEA BAL@ATL BUF@LAR", 6: "SEA@DEN HOU@JAX CHI@ATL BAL@CLE TEN@IND NYJ@NE NO@NYG CAR@PHI PIT@TB ARI@LAR LAC@KC BUF@LV DAL@GB WAS@SF", 7: "NE@CHI PIT@NO SF@ATL TB@CAR NYG@HOU IND@MIN MIA@NYJ CLE@TEN CIN@BAL DEN@ARI GB@DET LAR@LV KC@SEA DAL@PHI", 8: "CAR@GB BAL@BUF TEN@CIN ARI@DAL MIN@DET IND@JAX LV@NYJ CLE@PIT ATL@TB LAC@LAR KC@DEN NE@MIA PHI@WAS CHI@SEA", 9: "JAX@BAL CIN@ATL DEN@CAR DAL@IND NYJ@KC DET@MIA CLE@NO NYG@PHI LAR@WAS HOU@LAC LV@SF GB@NE ARI@SEA TB@CHI BUF@MIN", 10: "WAS@NYG NE@DET KC@ATL HOU@CLE MIA@IND MIN@GB CAR@NO BUF@NYJ JAX@TEN LAR@ARI SEA@LV SF@DAL PIT@CIN LAC@BAL", 11: "IND@HOU MIA@BUF BAL@CAR NO@CHI TEN@DAL TB@DET ARI@KC JAX@NYG NYJ@LAC LV@DEN PIT@PHI MIN@SF CIN@WAS", 12: "GB@LAR CHI@DET PHI@DAL KC@BUF DEN@PIT NO@CIN LV@CLE NYG@IND BAL@HOU NYJ@MIA ATL@MIN TEN@JAX WAS@ARI SEA@SF NE@LAC CAR@TB", 13: "KC@LAR DET@ATL JAX@CHI CIN@CLE GB@NO SF@NYG WAS@TEN LAC@TB PHI@ARI MIA@DEN CAR@MIN BUF@NE HOU@PIT DAL@SEA", 14: "MIN@NE NO@CAR ATL@CLE TEN@DET CHI@MIA DEN@NYJ IND@PHI TB@BAL HOU@WAS LAC@LV KC@CIN NYG@SEA LAR@SF BUF@GB PIT@JAX", 15: "SF@LAC SEA@PHI CHI@BUF CIN@CAR MIA@GB JAX@HOU CLE@NYG IND@TEN BAL@PIT NO@TB ATL@WAS NYJ@ARI DEN@LV DAL@LAR DET@MIN NE@KC", 16: "HOU@PHI GB@CHI BUF@DEN LAR@SEA TB@ATL CIN@IND LAC@MIA WAS@MIN ARI@NO NE@NYJ CAR@PIT CLE@BAL TEN@LV SF@KC JAX@DAL NYG@DET", 17: "BAL@CIN NO@ATL SEA@CAR IND@CLE NYG@DAL WAS@JAX BUF@MIA DEN@NE MIN@NYJ PIT@TEN KC@LAC LAR@TB LV@ARI DET@CHI PHI@SF HOU@GB", 18: "NYJ@BUF ATL@CAR CLE@CIN JAX@IND SF@ARI LAC@DEN DET@GB TEN@HOU LV@KC CHI@MIN TB@NO MIA@NE PHI@NYG SEA@LAR PIT@BAL DAL@WAS"};
 /* Real NFL slots for 2026-27, from the NFL's schedule announcement */
 const SLOT={"1 SF@LAR":["Melbourne"],"1 NE@SEA":["Kickoff game"],"3 BAL@DAL":["Rio"],"4 IND@WAS":["London"],"5 PHI@JAX":["London"],"6 HOU@JAX":["London"],"7 PIT@NO":["Paris"],"9 CIN@ATL":["Madrid"],"10 NE@DET":["Munich"],"11 MIN@SF":["Mexico City"],"12 CHI@DET":["Thanksgiving"],"12 PHI@DAL":["Thanksgiving"],"12 KC@BUF":["Thanksgiving"],"16 GB@CHI":["Christmas"],"16 BUF@DEN":["Christmas"],"16 LAR@SEA":["Christmas"]};
+// Team colour helpers: pick the team colour that shows up on dark navy, and readable text on a team colour.
+function lum(hex){const n=parseInt(String(hex).slice(1),16);const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);};return .2126*f(n>>16&255)+.7152*f(n>>8&255)+.0722*f(n&255);}
+function lighten(hex,amt){const n=parseInt(hex.slice(1),16);const m=v=>Math.round(v+(255-v)*amt);return '#'+[n>>16&255,n>>8&255,n&255].map(v=>m(v).toString(16).padStart(2,'0')).join('');}
+function teamPop(ab){const t=TEAM[ab]; if(!t) return '#8fc1e3';
+  if(lum(t.c1)>=.08) return t.c1;
+  if(t.c2.toUpperCase()!=='#FFFFFF'&&lum(t.c2)>=.08) return t.c2;
+  return lighten(t.c1,.4);}
+const textOn=hex=>lum(hex)>.35?'#05090f':'#ffffff';
+const teamOfCoach=c=>TEAMS.find(t=>t.full===c.team);
 const COACH_ID={}; COACHES.forEach(c=>{const t=TEAMS.find(t=>t.full===c.team); if(t)(COACH_ID[t.ab]=COACH_ID[t.ab]||[]).push(c);});
 const GAMES=[]; Object.entries(SCHED).forEach(([w,str])=>str.split(' ').forEach(m=>{const [a,h]=m.split('@'); GAMES.push({w:+w,a,h,key:w+' '+m});}));
 const S={week:1,team:'',g:'all',inited:false};
@@ -1454,12 +1496,12 @@ const gameKind=g=>(COACH_ID[g.a]&&COACH_ID[g.h])?'show':(COACH_ID[g.a]||COACH_ID
 function teamSide(ab,home){
   const t=TEAM[ab], cs=COACH_ID[ab];
   const coach=cs?`<div class="tm-coach">Coach ${cs.map(c=>esc(c.name)).join(' / ')}</div>`:`<div class="tm-coach open"><a href="#join">Open seat · claim it</a></div>`;
-  return `<div class="side-t${home?' home':''}"><span class="chip"><img src="logos/${ab}.png" alt="" loading="lazy"></span><div><div class="tm-name">${t.name}</div>${coach}</div></div>`;
+  return `<div class="side-t${home?' home':''}"><span class="chip" style="--tc:${teamPop(ab)}"><img src="logos/${ab}.png" alt="" loading="lazy"></span><div><div class="tm-name">${t.name}</div>${coach}</div></div>`;
 }
 function gameRow(g){
   const k=gameKind(g), tags=[...(k==='show'?['<span class="gtag sh">Coach vs coach</span>']:[]),...(SLOT[g.key]||[]).map(x=>`<span class="gtag">${x}</span>`)];
   const label=`${TEAM[g.a].full} at ${TEAM[g.h].full}, week ${g.w}, date and time to be announced`;
-  return `<article class="game ${k}" aria-label="${label}">${tags.length?`<div class="gtags">${tags.join('')}</div>`:''}
+  return `<article class="game tc ${k}" style="--ca:${teamPop(g.a)};--ch:${teamPop(g.h)}" aria-label="${label}">${tags.length?`<div class="gtags">${tags.join('')}</div>`:''}
     ${teamSide(g.a,false)}<div class="mid"><span class="at">@</span>${midCell(g)}</div>${teamSide(g.h,true)}</article>`;
 }
 const passG=g=>S.g==='all'||(S.g==='rnn'&&gameKind(g))||(S.g==='show'&&gameKind(g)==='show');
@@ -1614,6 +1656,7 @@ function showLocker(){
   $('lk-recheck').hidden=!!(me&&me.status==='removed');
   if(me&&me.status==='approved'){
     $('lk-avatar').src=me.avatar||'assets/rnn-logo-480.png';
+    $('lk-avatar').style.borderColor=me.teams&&me.teams[0]?teamPop(me.teams[0]):'';
     $('lk-name').textContent=me.display;
     $('lk-teams').innerHTML=me.teams.length?teamTags(me.teams):'<span class="lk-hint">No team assigned yet</span>';
     $('lk-admin-tab').hidden=me.role!=='admin';
@@ -1915,7 +1958,7 @@ function renderOnAir(){
   const t=Date.now(), bAt=b.at?Date.parse(b.at):NaN;
   if(live) FZ.target={live:true,title:b.title||'RNN Broadcast',at:isNaN(bAt)?null:bAt};
   else if(!isNaN(bAt)&&bAt>t) FZ.target={title:b.title||'RNN Broadcast',at:bAt};
-  else if(L.nextGame&&Date.parse(L.nextGame.at)>t) FZ.target={title:gameLabel(L.nextGame.game),at:Date.parse(L.nextGame.at)};
+  else if(L.nextGame&&Date.parse(L.nextGame.at)>t){const m=/^W\d+-(\w+)@(\w+)$/.exec(L.nextGame.game)||[]; FZ.target={title:gameLabel(L.nextGame.game),at:Date.parse(L.nextGame.at),ca:m[1]&&teamPop(m[1]),ch:m[2]&&teamPop(m[2])};}
   else FZ.target=null;
   if(FZ.target&&!live) $('oa-txt').textContent='Next up · '+FZ.target.title;
   tick();
@@ -1924,6 +1967,7 @@ function tick(){
   const T=FZ.target, cd=$('cd');
   cd.hidden=!T; if(!T) return;
   cd.classList.toggle('is-live',!!T.live);
+  cd.classList.toggle('teams',!!(T.ca&&T.ch)); if(T.ca&&T.ch){cd.style.setProperty('--cda',T.ca);cd.style.setProperty('--cdb',T.ch);}
   $('cd-live').hidden=!T.live; $('cd-clock').hidden=!!T.live;
   $('cd-label').textContent=T.live?'On air now':'Next up';
   $('cd-title').textContent=T.title;
@@ -2020,13 +2064,14 @@ function talkMsg(t,k){const m=$('talk-msg'); m.textContent=t||''; m.className='m
 $('talk-target').innerHTML+= [...TEAMS].sort((a,b)=>a.full.localeCompare(b.full)).map(t=>`<option value="${t.ab}">${esc(t.full)}${coachOf(t.ab)?' · '+esc(coachOf(t.ab)):''}</option>`).join('');
 function badgeFor(a){
   if(a.commish) return `<span class="tk-badge commish">Commish</span>`;
-  if(a.coach&&a.teams.length&&TEAM[a.teams[0]]) return `<span class="tk-badge coach"><img src="logos/${a.teams[0]}.png" alt="">${TEAM[a.teams[0]].name} coach</span>`;
+  if(a.coach&&a.teams.length&&TEAM[a.teams[0]]){const T=TEAM[a.teams[0]]; return `<span class="tk-badge coach tbadge" style="--c1:${T.c1};--c2:${T.c2};--on:${textOn(T.c1)}"><img src="logos/${a.teams[0]}.png" alt="">${T.name} coach</span>`;}
   if(a.coach) return `<span class="tk-badge coach">Coach</span>`;
   return `<span class="tk-badge">Fan</span>`;
 }
 function postHtml(p){
   const T=p.target&&TEAM[p.target];
-  return `<article class="tk" data-post="${p.id}">${avatarHtml(p.author,44)}
+  const tc=p.author.coach&&p.author.teams.length&&TEAM[p.author.teams[0]]?teamPop(p.author.teams[0]):'';
+  return `<article class="tk${tc?' tk-team':''}" data-post="${p.id}"${tc?` style="--tc:${tc}"`:''}>${avatarHtml(p.author,44)}
     <div class="tk-head"><b>${esc(p.author.display)}</b>${badgeFor(p.author)}<span class="tk-time">${ago(p.created)}</span></div>
     ${T?`<span class="tk-at" style="--c1:${T.c1};--c2:${T.c2}"><img src="logos/${T.ab}.png" alt="">@ ${T.name}</span>`:''}
     <p class="tk-body">${esc(p.body)}</p>
