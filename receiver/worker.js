@@ -246,6 +246,7 @@ const FAN_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS talk (id INTEGER PRIMARY KEY AUTOINCREMENT, author_id TEXT, target TEXT, body TEXT, created TEXT)`,
   `CREATE TABLE IF NOT EXISTS talk_reacts (post_id INTEGER, member_id TEXT, emoji TEXT, PRIMARY KEY (post_id, member_id, emoji))`,
   `CREATE TABLE IF NOT EXISTS signups (member_id TEXT PRIMARY KEY, team TEXT, coach TEXT, console TEXT, gamer_id TEXT, contact TEXT, exp TEXT, days TEXT, note TEXT, status TEXT, created TEXT, updated TEXT)`,
+  `CREATE TABLE IF NOT EXISTS profile_claims (member_id TEXT PRIMARY KEY, coach_id TEXT, coach TEXT, team TEXT, status TEXT, created TEXT, updated TEXT)`,
   `CREATE TABLE IF NOT EXISTS highlights (id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT, vid TEXT, title TEXT, submitted_by TEXT, status TEXT, created TEXT, reviewed_by TEXT)`,
 ];
 
@@ -690,6 +691,73 @@ async function handleSignupApi(request, env, route, me, ok, err, ctx) {
     }
   }
 
+  // ---- Existing coaches claim their coach profile; the commissioner confirms ----
+  if (route[0] === "profile-claims" && route[1] === "mine") {
+    if (!me) return err("Please sign in.", 401);
+    if (me.status !== "approved") return err("Your account is waiting for the commissioner's approval.", 403);
+    const mine = await db.prepare(`SELECT * FROM profile_claims WHERE member_id = ?1`).bind(me.id).first();
+    if (M === "GET") {
+      const others = await db.prepare(`SELECT coach_id, team FROM profile_claims WHERE status IN ('pending','approved') AND member_id != ?1`).bind(me.id).all();
+      const held = await db.prepare(`SELECT teams FROM members WHERE status = 'approved' AND id != ?1 AND teams != ''`).bind(me.id).all();
+      return ok({
+        mine: mine ? { coachId: mine.coach_id, coach: mine.coach, team: mine.team, status: mine.status, created: mine.created } : null,
+        takenCoaches: others.results.map((x) => x.coach_id),
+        takenTeams: [...new Set([...others.results.filter((x) => x).map((x) => x.team), ...held.results.flatMap((x) => (x.teams || "").split(",").filter(Boolean))])],
+      });
+    }
+    if (M === "POST") {
+      const b = await readJson(request);
+      const coachId = String(b.coachId || ""), team = String(b.team || "").toUpperCase(), coach = clean(b.coach, 40);
+      if (!/^[a-z0-9-]{2,40}$/.test(coachId) || !TEAM_ABBRS.has(team) || !coach) return err("Pick your coach card.");
+      if (mine && mine.status === "approved") return err("Your profile is already confirmed.", 409);
+      const other = await db.prepare(`SELECT 1 AS x FROM profile_claims WHERE coach_id = ?1 AND status IN ('pending','approved') AND member_id != ?2`).bind(coachId, me.id).first();
+      const held = await db.prepare(`SELECT 1 AS x FROM members WHERE status = 'approved' AND id != ?2 AND (',' || teams || ',') LIKE ?1`).bind(`%,${team},%`, me.id).first();
+      if (other || held) return err("Someone already claimed that coach profile. If it's yours, tell the commissioner.", 409);
+      await db.prepare(`INSERT INTO profile_claims VALUES (?1,?2,?3,?4,'pending',?5,?5)
+        ON CONFLICT(member_id) DO UPDATE SET coach_id=?2, coach=?3, team=?4, status='pending', updated=?5`).bind(me.id, coachId, coach, team, t).run();
+      if (!mine || mine.coach_id !== coachId || mine.status !== "pending") {
+        ctx.waitUntil(discordPost(env.WEBHOOK_SIGNUPS, {
+          title: `${me.display || me.username} says they're ${coach}`,
+          description: `@${me.username} claimed the ${coach} coach profile (${TEAM_NAMES[team] || team}). Confirm it in Locker Room → Commissioner.`,
+          color: 0x8fc1e3, url: siteLink(env, "locker"),
+        }));
+      }
+      return ok({ success: true }, 201);
+    }
+    if (M === "DELETE") {
+      if (mine && mine.status === "approved") return err("Your profile is confirmed. Ask the commissioner to change it.", 409);
+      await db.prepare(`DELETE FROM profile_claims WHERE member_id = ?1`).bind(me.id).run();
+      return ok({ success: true });
+    }
+  }
+  if (route[0] === "admin" && route[1] === "profile-claims") {
+    if (!isAdmin) return err("Only the commissioner can do that.", 403);
+    if (M === "GET") {
+      const r = await db.prepare(`SELECT p.*, m.username, m.display, m.avatar FROM profile_claims p LEFT JOIN members m ON m.id = p.member_id
+        ORDER BY CASE p.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, p.created`).all();
+      return ok({ claims: r.results.map((x) => ({ id: x.member_id, username: x.username, display: x.display || x.username, avatar: x.avatar, coachId: x.coach_id, coach: x.coach, team: x.team, status: x.status, created: x.created })) });
+    }
+    const row = route[2] ? await db.prepare(`SELECT * FROM profile_claims WHERE member_id = ?1`).bind(route[2]).first() : null;
+    if (!row) return err("That claim was cancelled.", 404);
+    if (M === "POST") {
+      const action = (await readJson(request)).action;
+      if (action === "approve") {
+        const held = await db.prepare(`SELECT display FROM members WHERE status = 'approved' AND id != ?2 AND (',' || teams || ',') LIKE ?1`).bind(`%,${row.team},%`, row.member_id).first();
+        if (held) return err(`${held.display} already has the ${TEAM_NAMES[row.team] || row.team}. Change their team in Members first.`, 409);
+        await db.batch([
+          db.prepare(`UPDATE profile_claims SET status = 'approved', updated = ?2 WHERE member_id = ?1`).bind(row.member_id, t),
+          db.prepare(`UPDATE members SET teams = ?2 WHERE id = ?1`).bind(row.member_id, row.team),
+        ]);
+        return ok({ success: true });
+      }
+      if (action === "decline") {
+        await db.prepare(`UPDATE profile_claims SET status = 'declined', updated = ?2 WHERE member_id = ?1`).bind(row.member_id, t).run();
+        return ok({ success: true });
+      }
+      return err("Approve or decline.");
+    }
+  }
+
   // Commissioner review
   if (route[0] === "admin" && route[1] === "signups") {
     if (!isAdmin) return err("Only the commissioner can do that.", 403);
@@ -704,7 +772,7 @@ async function handleSignupApi(request, env, route, me, ok, err, ctx) {
     if (M === "POST") {
       const action = (await readJson(request)).action;
       if (action === "approve") {
-        const coached = await db.prepare(`SELECT display FROM members WHERE status = 'approved' AND id != ?2 AND (',' || teams || ',') LIKE ?1`).bind(`%,${row.team},%`).first();
+        const coached = await db.prepare(`SELECT display FROM members WHERE status = 'approved' AND id != ?2 AND (',' || teams || ',') LIKE ?1`).bind(`%,${row.team},%`, row.member_id).first();
         if (coached) return err(`${coached.display} already runs the ${TEAM_NAMES[row.team] || row.team}.`, 409);
         await db.batch([
           db.prepare(`UPDATE signups SET status = 'approved', updated = ?2 WHERE member_id = ?1`).bind(id, t),

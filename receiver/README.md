@@ -161,6 +161,13 @@ Coaches paste YouTube, Twitch clip or video, or TikTok links in **Locker Room �
 ### Trash Talk
 Anyone can read it. Coaches and fans post after signing in with Discord. Fans don't land in your approval queue. Posts are limited to 280 characters, one every 15 seconds, with five emoji reactions. Commissioners can **Delete** any post or **Block** a person. Blocked people can be restored in **Commissioner → Members**.
 
+## Existing coaches claim their profile
+
+When an approved coach (for example, someone with the @Coach role) signs in to the Locker Room without a team, they see the 15 coach cards and tap theirs twice to confirm. Cards already claimed, or whose team is already assigned, are greyed out.
+- Nothing changes until a commissioner confirms. Claims show under **Commissioner → Coach profiles to confirm**, and a post goes to the commissioners' Discord channel.
+- **Confirm** sets their team, so their games show in **My Games**. **Decline** lets them pick again.
+- Coaches can cancel a waiting claim, but can't change a confirmed one. Commissioners can still change anyone's team in **Members**.
+
 ## Join the League sign-ups
 
 The **Join the League** page lets people claim one of the open teams. They sign in with Discord when they send the form, and what they typed is kept while they sign in.

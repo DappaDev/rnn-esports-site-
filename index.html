@@ -275,6 +275,7 @@ footer img{width:28px;height:28px}
 .lk-person b{font-family:var(--f-tag);font-weight:400;font-size:19px}
 .lk-person.row{display:flex;justify-items:start;text-align:left;flex-wrap:wrap;align-items:center;max-width:900px}
 .lk-person.row>span{flex:1;min-width:160px;display:grid}
+.lk-person.row>.lk-av{flex:0 0 auto;min-width:0;display:inline-grid}
 .lk-person select,.tbl select{font:inherit;font-size:14px;color:var(--ice);background:var(--navy-900);border:1px solid var(--line);border-radius:3px;padding:6px 8px;max-width:100%}
 .lk-h3{font-family:var(--f-sign);font-weight:400;font-size:18px;margin:10px 0 0;color:var(--sky)}
 .lk-invite input{font:inherit;font-size:15px;color:var(--ice);background:var(--navy-900);border:1px solid var(--line);border-radius:3px;padding:8px 10px;flex:1;max-width:320px;min-width:0}
@@ -691,6 +692,22 @@ html,body{overflow-x:clip}
 .su-st{font-family:var(--f-cond);font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:3px;background:var(--navy-600);white-space:nowrap}
 .su-st.approved{background:var(--neon);color:var(--ink)}.su-st.declined{background:#5a2124;color:#ffb3b5}
 .admin td .btn{margin:2px 4px 2px 0}
+.lk-claim{margin:0 0 22px;padding:20px;background:var(--navy-800);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--neon);border-radius:4px;display:grid;gap:12px}
+.lk-claim h2{margin:0}
+.lk-claim{grid-template-columns:minmax(0,1fr)}
+.claim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;min-width:0}
+.claim-card{font:inherit;color:inherit;text-align:left;padding:0;cursor:pointer;background:var(--c1);border:3px solid var(--team);border-radius:4px;overflow:hidden;display:grid;box-shadow:4px 4px 0 var(--ink);transition:transform .15s ease}
+.claim-card:hover:not(:disabled){transform:translateY(-3px)}
+.claim-card{min-width:0}
+.claim-card img{width:100%;height:auto;aspect-ratio:1200/1006;object-fit:cover;display:block;background:var(--navy-900)}
+.claim-card span{padding:8px 10px;display:grid;color:var(--on)}
+.claim-card b{font-family:var(--f-cond);font-weight:800;font-size:17px;line-height:1.1}
+.claim-card small{font-family:var(--f-cond);font-size:13px;opacity:.85}
+.claim-card:disabled{cursor:not-allowed;filter:grayscale(.85);opacity:.55}
+.claim-card .claim-tag{font-family:var(--f-cond);font-weight:700;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:1}
+.claim-wait{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.claim-wait img{width:120px;border:3px solid var(--team);border-radius:4px}
+.claim-wait p{margin:0;flex:1 1 220px}
 .lk-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
 @media (max-width:640px){.lk-grid2{grid-template-columns:1fr}}
 .bc-state{font-family:var(--f-sign);font-size:13px;padding:4px 10px;border:2px solid var(--ink);background:var(--navy-600);color:var(--ice-dim)}
@@ -943,6 +960,12 @@ html,body{overflow-x:clip}
           <a class="btn ok lk-discord lk-discord-top" data-discord-link hidden target="_blank" rel="noopener" href="#">Open RNN Discord</a>
           <button type="button" class="btn" data-signout>Sign out</button>
         </div>
+        <section class="lk-claim" id="lk-claim" hidden aria-labelledby="lk-claim-h">
+          <h2 id="lk-claim-h">Which coach are you?</h2>
+          <p class="lk-hint" id="lk-claim-text">Tap your coach card to link your Discord account to your team. The commissioner confirms it, then your games show up in My Games.</p>
+          <div class="claim-grid" id="claim-grid"></div>
+          <div class="claim-wait" id="claim-wait" hidden></div>
+        </section>
         <div class="weeks lk-tabs" role="tablist" aria-label="Locker Room sections">
           <button type="button" role="tab" data-lt="news" aria-selected="true">Announcements</button>
           <button type="button" role="tab" data-lt="board" aria-selected="false">Message Board</button>
@@ -1021,6 +1044,8 @@ html,body{overflow-x:clip}
             </div>
             <div class="lk-row"><span class="lk-hint" id="mw-state">No matchup set.</span><span class="lk-row"><button type="button" class="btn" id="mw-toggle" hidden>Close voting</button><button type="submit" class="submit">Start new vote</button></span></div>
           </form>
+          <h3 class="lk-h3">Coach profiles to confirm</h3>
+          <div id="adm-claims" class="lk-list"></div>
           <h3 class="lk-h3">League sign-ups</h3>
           <p class="lk-hint" id="adm-signups">Checking…</p>
           <h3 class="lk-h3">Highlights to review</h3>
@@ -1757,8 +1782,66 @@ function showLocker(){
     $('lk-admin-tab').hidden=me.role!=='admin';
     $('ann-form').hidden=me.role!=='admin';
     openTab(LK.tab);
+    loadClaim();
   }
 }
+/* ---- Existing coaches: claim your coach profile (commissioner confirms) ---- */
+const coachTeamAb=c=>teamOfCoach(c)?.ab;
+async function loadClaim(){
+  const box=$('lk-claim'), me=LK.me;
+  if(!API_BASE||!me||me.status!=='approved'){box.hidden=true;return;}
+  let d; try{d=await api('/api/profile-claims/mine');}catch(_){box.hidden=true;return;}
+  const mine=d.mine;
+  // Hide once their team is set, unless a claim is still waiting
+  if(me.teams.length&&!(mine&&mine.status==='pending')){box.hidden=true;return;}
+  box.hidden=false;
+  const takenC=new Set(d.takenCoaches), takenT=new Set(d.takenTeams);
+  if(mine&&mine.status==='pending'){
+    const c=COACHES.find(x=>x.id===mine.coachId);
+    $('claim-grid').hidden=true; $('lk-claim-h').textContent='Waiting for the commissioner';
+    $('lk-claim-text').hidden=true; $('claim-wait').hidden=false;
+    $('claim-wait').style.setProperty('--team',c?c.color:'#8fc1e3');
+    $('claim-wait').innerHTML=`${c?`<img src="coaches/${esc(c.id)}.jpg" alt="">`:''}<p>You said you’re <b>${esc(mine.coach)}</b> (${esc(TEAM[mine.team]?.full||mine.team)}). The commissioner will confirm it soon, then your games show up in My Games.</p><button type="button" class="btn" id="claim-cancel">Wrong coach? Cancel</button>`;
+    return;
+  }
+  $('claim-grid').hidden=false; $('claim-wait').hidden=true; $('lk-claim-text').hidden=false;
+  $('lk-claim-h').textContent='Which coach are you?';
+  $('lk-claim-text').textContent=(mine&&mine.status==='declined'?`The commissioner didn’t confirm you as ${mine.coach}. Pick your coach card again, or message the commissioner in Discord. `:'')+'Tap your coach card to link your Discord account to your team. The commissioner confirms it, then your games show up in My Games.';
+  $('claim-grid').innerHTML=COACHES.map(c=>{const t=teamOfCoach(c), ab=coachTeamAb(c), taken=takenC.has(c.id)||takenT.has(ab);
+    return `<button type="button" class="claim-card" data-claim="${esc(c.id)}" ${taken?'disabled':''} style="--team:${c.color};--c1:${t?.c1||'#1b2c3c'};--on:${textOn(t?.c1||'#1b2c3c')}" aria-label="${esc(c.name)}, ${esc(c.team)}${taken?', already claimed':''}">
+      <img src="coaches/${esc(c.id)}.jpg" alt="" loading="lazy" width="1200" height="1006"><span><b>${esc(c.name)}</b><small>${esc(c.team)}</small>${taken?'<small class="claim-tag">Claimed</small>':''}</span></button>`;}).join('');
+}
+$('lk-claim').addEventListener('click',async e=>{ try{
+  const b=e.target.closest('[data-claim]'), cancel=e.target.closest('#claim-cancel');
+  if(b){
+    const c=COACHES.find(x=>x.id===b.dataset.claim); if(!c) return;
+    if(b.dataset.confirm!=='1'){
+      document.querySelectorAll('#claim-grid [data-confirm]').forEach(x=>{x.removeAttribute('data-confirm');});
+      b.dataset.confirm='1'; lkMsg(`Tap ${c.name} again to confirm that’s you.`,''); return;}
+    await api('/api/profile-claims/mine',{method:'POST',body:{coachId:c.id,coach:c.name,team:coachTeamAb(c)}});
+    lkMsg('Sent. The commissioner will confirm it.','ok'); loadClaim();
+  }
+  if(cancel){await api('/api/profile-claims/mine',{method:'DELETE'}); lkMsg('Claim cancelled. Pick your coach card.','ok'); loadClaim();}
+  }catch(err){lkMsg(err.message,'err'); loadClaim();}
+});
+// Commissioner: confirm coach profile claims
+async function loadAdminClaims(){
+  try{
+    const {claims}=await api('/api/admin/profile-claims');
+    const pend=claims.filter(x=>x.status==='pending');
+    $('adm-claims').innerHTML=pend.length?pend.map(x=>{const c=COACHES.find(y=>y.id===x.coachId);
+      return `<div class="lk-person row">${avatarHtml(x,40)}<span><b>${esc(x.display)}</b><span class="lk-meta">@${esc(x.username||'')} says they’re <b>${esc(x.coach)}</b> · ${esc(TEAM[x.team]?.full||x.team)}</span></span>
+        ${c?`<img src="coaches/${esc(c.id)}.jpg" alt="" width="96" style="border-radius:3px;border:2px solid ${esc(c.color)}">`:''}
+        <button type="button" class="btn ok" data-pc-ok="${esc(x.id)}">Confirm</button><button type="button" class="btn danger" data-pc-no="${esc(x.id)}">Decline</button></div>`;}).join('')
+      :'<p class="none">No coach profiles waiting. Coaches pick theirs the first time they sign in without a team.</p>';
+  }catch(_){}
+}
+$('adm-claims').addEventListener('click',async e=>{ try{
+  const ok=e.target.closest('[data-pc-ok]'), no=e.target.closest('[data-pc-no]'); if(!ok&&!no) return;
+  await api('/api/admin/profile-claims/'+encodeURIComponent((ok||no).dataset[ok?'pcOk':'pcNo']),{method:'POST',body:{action:ok?'approve':'decline'}});
+  lkMsg(ok?'Confirmed. Their team is set.':'Declined. They can pick again.','ok'); loadAdmin();
+  }catch(err){lkMsg(err.message,'err');}
+});
 async function loadMe(){
   if(!tokGet()){LK.me=null;showLocker();return;}
   try{LK.me=(await api('/api/me')).member;}catch(e){if(e.status!==401)$('lk-out-msg').textContent=e.message;}
@@ -1872,7 +1955,7 @@ const teamOptions=sel=>'<option value="">No team</option>'+[...TEAMS].sort((a,b)
 const loadAdmin=wrapErr(async()=>{
   const {members,invites}=await api('/api/admin/members');
   const pend=members.filter(m=>m.status==='pending'&&!m.fan);
-  loadAdminFan();
+  loadAdminFan(); loadAdminClaims();
   const noteam=members.filter(m=>m.status==='approved'&&!m.teams.length);
   $('adm-noteam').innerHTML=noteam.length?noteam.map(m=>`<div class="lk-person row">${avatarHtml(m,40)}<span><b>${esc(m.display)}</b><span class="lk-meta">@${esc(m.username)}</span></span>
     <label class="sr" for="nt-${m.id}">Team</label><select id="nt-${m.id}" data-team="${m.id}">${teamOptions('')}</select></div>`).join(''):'<p class="none">Every member has a team.</p>';
