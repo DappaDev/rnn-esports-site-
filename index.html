@@ -720,8 +720,8 @@ html,body{overflow-x:clip}
   </div>
 </header>
 <div class="ticker" aria-hidden="true"><div class="ticker-track">
-  <span>RNN E-Sports</span><i>★</i><span>Madden 27</span><i>★</i><span>15 coaches</span><i>★</i><span>Every snap live</span><i>★</i><span>Run it up</span><i>★</i>
-  <span>RNN E-Sports</span><i>★</i><span>Madden 27</span><i>★</i><span>15 coaches</span><i>★</i><span>Every snap live</span><i>★</i><span>Run it up</span><i>★</i>
+  <span>RNN E-Sports</span><i>★</i><span>Madden 27</span><i>★</i><span>PS5 + Xbox</span><i>★</i><span>15 coaches</span><i>★</i><span>Every snap live</span><i>★</i><span>Run it up</span><i>★</i>
+  <span>RNN E-Sports</span><i>★</i><span>Madden 27</span><i>★</i><span>PS5 + Xbox</span><i>★</i><span>15 coaches</span><i>★</i><span>Every snap live</span><i>★</i><span>Run it up</span><i>★</i>
 </div></div>
 
 <div id="view-home">
@@ -731,17 +731,17 @@ html,body{overflow-x:clip}
       <div class="vinyl" aria-hidden="true"></div>
       <img class="crest" src="assets/rnn-logo-480.png" alt="RNN E-Sports crest: a football player with the ball, ringed by stars">
       <span class="sticker st-a" aria-hidden="true">Season 1</span>
-      <span class="sticker st-b" aria-hidden="true">PS5 only</span>
+      <span class="sticker st-b" aria-hidden="true">PS5 + Xbox</span>
     </div>
     <div>
-      <div class="eyebrow"><span class="stars">★★★</span> Madden 27 · PlayStation 5</div>
+      <div class="eyebrow"><span class="stars">★★★</span> Madden 27 · PS5 &amp; Xbox</div>
       <h1>Every snap,<br><span class="tag">live</span> from the league.</h1>
       <p class="kicker">Don’t talk about it, settle it on the field.</p>
-      <p class="lede">The RNN E-Sports league broadcasts head-to-head Madden 27 games between fifteen coaches, each running a franchise of their choice.</p>
+      <p class="lede">The RNN E-Sports league broadcasts head-to-head Madden 27 games between fifteen coaches on PlayStation&nbsp;5 and <span style="white-space:nowrap">Xbox Series X|S</span>, each running a franchise of their choice.</p>
       <div class="facts" aria-label="League at a glance">
         <div><b>15</b><span>Coaches</span></div>
         <div><b>15</b><span>Franchises</span></div>
-        <div><b>PS5</b><span>Platform</span></div>
+        <div><b>2</b><span>Consoles</span></div>
       </div>
       <a class="cta cta-neon" href="#join">Claim an open team <span aria-hidden="true">→</span></a>
     </div>
@@ -1120,13 +1120,15 @@ html,body{overflow-x:clip}
             <div class="pick-line" aria-live="polite"><span class="sub" style="margin:0">Your team</span> <b id="pick-name">None picked yet</b> <a href="#board" id="pick-change" style="font-size:15px">Pick from the board</a></div>
             <div class="row2">
               <div class="fld"><label for="f-coach">Coach name</label><input id="f-coach" maxlength="28" autocomplete="nickname" placeholder="How the broadcast calls you" required></div>
-              <div class="fld"><label for="f-psn">PSN ID</label><input id="f-psn" maxlength="32" autocomplete="off" placeholder="Your PlayStation Network ID" required></div>
+              <div class="fld"><label for="f-console">Console</label>
+                <select id="f-console"><option value="PS5">PlayStation 5</option><option value="Xbox">Xbox Series X|S</option></select></div>
             </div>
             <div class="row2">
-              <div class="fld"><label for="f-contact">Email or phone</label><input id="f-contact" maxlength="80" autocomplete="email" placeholder="So the commissioner can reach you" required><span class="hint">Only league admins see this.</span></div>
+              <div class="fld"><label for="f-psn" id="f-psn-label">PSN ID</label><input id="f-psn" maxlength="32" autocomplete="off" placeholder="Your PlayStation Network ID" required></div>
               <div class="fld"><label for="f-exp">Madden experience</label>
                 <select id="f-exp"><option>Rookie</option><option selected>Pro</option><option>All-Pro</option><option>All-Madden</option></select></div>
             </div>
+            <div class="fld"><label for="f-contact">Email or phone</label><input id="f-contact" maxlength="80" autocomplete="email" placeholder="So the commissioner can reach you" required><span class="hint">Only league admins see this.</span></div>
             <fieldset class="fld">
               <legend>Nights you can play</legend>
               <div class="days" id="f-days">
@@ -1151,7 +1153,7 @@ html,body{overflow-x:clip}
       </div>
       <div class="admin" id="admin" hidden>
         <div class="sec-head" style="margin-top:44px"><div><h2>Sign-Up Requests</h2><p class="sub">Visible to league admins only</p></div></div>
-        <div class="tbl"><table><thead><tr><th>Coach</th><th>Team</th><th>PSN ID</th><th>Contact</th><th>Experience</th><th>Nights</th><th>Trash talk</th><th>Received</th><th></th></tr></thead><tbody id="admin-rows"></tbody></table></div>
+        <div class="tbl"><table><thead><tr><th>Coach</th><th>Team</th><th>Console · ID</th><th>Contact</th><th>Experience</th><th>Nights</th><th>Trash talk</th><th>Received</th><th></th></tr></thead><tbody id="admin-rows"></tbody></table></div>
       </div>
     </div>
   </section>
@@ -1346,8 +1348,16 @@ function showMine(){
     $('mine-text').textContent=`Your request is in. The RNN commissioner will reach out at ${s.contact} to confirm your seat. Requested ${new Date(s.at).toLocaleDateString()}.`;
   }
 }
+// PS5 players give a PSN ID, Xbox players a Gamertag
+function syncConsole(){
+  const x=$('f-console').value==='Xbox';
+  $('f-psn-label').textContent=x?'Xbox Gamertag':'PSN ID';
+  $('f-psn').placeholder=x?'Your Xbox Gamertag':'Your PlayStation Network ID';
+}
+$('f-console').addEventListener('change',syncConsole);
+$('sheet').addEventListener('reset',()=>setTimeout(syncConsole,0));
 function fillForm(s){
-  $('f-coach').value=s.coach||''; $('f-psn').value=s.psn||''; $('f-contact').value=s.contact||'';
+  $('f-coach').value=s.coach||''; $('f-console').value=s.console==='Xbox'?'Xbox':'PS5'; syncConsole(); $('f-psn').value=s.psn||''; $('f-contact').value=s.contact||'';
   $('f-exp').value=s.exp||'Pro'; $('f-note').value=s.note||'';
   document.querySelectorAll('#f-days input').forEach(i=>i.checked=(s.days||[]).includes(i.value));
   $('p-nm').textContent=s.coach||'Coach Name'; setPick(s.team);
@@ -1372,11 +1382,12 @@ $('sheet').addEventListener('submit',async e=>{
   if(!J.pick){msg('Pick an open team from the draft board first.','err');document.getElementById('board').scrollIntoView();return;}
   if(teamState(J.pick)!=='open'){msg(`The ${TEAM[J.pick].name} were just requested by someone else. Pick another open team.`,'err');return;}
   if(!coach){msg('Add the coach name the broadcast should use.','err');$('f-coach').focus();return;}
-  if(!psn){msg('Add your PSN ID so we can send game invites.','err');$('f-psn').focus();return;}
+  const consoleName=$('f-console').value==='Xbox'?'Xbox':'PS5';
+  if(!psn){msg(consoleName==='Xbox'?'Add your Xbox Gamertag so we can send game invites.':'Add your PSN ID so we can send game invites.','err');$('f-psn').focus();return;}
   if(!contact){msg('Add an email or phone number so the commissioner can confirm your seat.','err');$('f-contact').focus();return;}
   if(!days.length){msg('Pick at least one night you can play.','err');return;}
   const at=J.mySignup?.at||new Date().toISOString();
-  const signup={coach,psn,contact,exp:$('f-exp').value,days,note:$('f-note').value.trim(),team:J.pick,at,updated:new Date().toISOString()};
+  const signup={coach,console:consoleName,psn,contact,exp:$('f-exp').value,days,note:$('f-note').value.trim(),team:J.pick,at,updated:new Date().toISOString()};
   $('f-submit').disabled=true; msg('Sending your request…');
   try{
     await J.db.doc('claims/'+J.me).set({team:J.pick,coach,at});
@@ -1393,7 +1404,7 @@ function renderAdmin(docs){
   $('admin').hidden=false;
   const rows=docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
   $('admin-rows').innerHTML=rows.length?rows.map(r=>`<tr>
-    <td><b>${esc(r.coach)}</b></td><td>${esc(TEAM[r.team]?.full||r.team)}</td><td>${esc(r.psn)}</td><td style="user-select:all">${esc(r.contact)}</td>
+    <td><b>${esc(r.coach)}</b></td><td>${esc(TEAM[r.team]?.full||r.team)}</td><td><b>${esc(r.console||'PS5')}</b> · ${esc(r.psn)}</td><td style="user-select:all">${esc(r.contact)}</td>
     <td>${esc(r.exp)}</td><td>${esc((r.days||[]).join(', '))}</td><td>${esc(r.note)}</td><td>${r.at?new Date(r.at).toLocaleDateString():''}</td>
     <td><button type="button" class="btn danger" data-del="${esc(r.id)}">Remove</button></td></tr>`).join('')
     :'<tr><td colspan="9" class="empty">No sign-ups yet. Requests appear here as soon as someone claims a team.</td></tr>';

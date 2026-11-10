@@ -2,7 +2,7 @@
 
 This receives the **Madden 27 Companion App franchise export** and feeds the site's **Scores & Stats** page and the final scores on the **Schedule** page.
 
-It runs free on Cloudflare: one Worker (`worker.js`) and one D1 database. Players never share PSN or EA logins. The commissioner taps **Export** in the Companion App, and the league data comes here.
+It runs free on Cloudflare: one Worker (`worker.js`) and one D1 database. Players never share PSN, Xbox or EA logins. The commissioner taps **Export** in the Companion App, and the league data comes here.
 
 ## One-time setup (no terminal needed, about 15 minutes)
 
