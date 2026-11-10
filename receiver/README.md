@@ -134,6 +134,33 @@ Open **rnn-receiver → Edit code**, replace everything with the new `worker.js`
 
 Removing a member signs them out everywhere right away.
 
+## Fan Zone (home page), about 5 minutes
+
+The home page has a countdown, a Twitch player with the Discord chat beside it, **Matchup of the Week** voting, the **Highlight Wall** and the **Trash Talk** board. They're all run from **Locker Room → Commissioner**. No new Worker settings are needed.
+
+### Twitch and the countdown
+In **Commissioner → On Air**, enter your Twitch channel name, the title of the next broadcast and its start time, then click **Save**.
+- The home page counts down to that time and flips to **LIVE** with the Twitch player when it starts. It stays live for 4 hours or until you click **End broadcast**.
+- Click **Go live now** to switch it on early.
+- If no broadcast is set, the countdown uses the next confirmed game time.
+
+### Live Discord chat beside the video (WidgetBot, free)
+1. Create a channel in your server for the broadcast chat, for example **#live-chat**.
+2. Go to **add.widgetbot.io**, sign in with Discord and add the WidgetBot bot to the RNN server.
+3. In Discord, right-click **#live-chat** and choose **Copy Channel ID**. Developer Mode must be on.
+4. Paste the ID into **Commissioner → On Air → Discord chat channel ID** and click **Save**.
+
+Viewers can read the chat right away. To type, they sign in with their Discord account inside the chat box, and their messages land in **#live-chat**. Discord's own moderation (roles, slow mode, bans) applies.
+
+### Matchup of the Week
+Pick two teams in **Commissioner → Matchup of the Week**, then click **Start new vote**. Fans vote without an account, with one vote per browser and a cap per connection. **Close voting** freezes the final results.
+
+### Highlight Wall
+Coaches paste YouTube, Twitch clip or video, or TikTok links in **Locker Room → Highlights**. You approve or reject them in **Commissioner → Highlights to review**. Clips you add yourself go straight up.
+
+### Trash Talk
+Anyone can read it. Coaches and fans post after signing in with Discord. Fans don't land in your approval queue. Posts are limited to 280 characters, one every 15 seconds, with five emoji reactions. Commissioners can **Delete** any post or **Block** a person. Blocked people can be restored in **Commissioner → Members**.
+
 ## Addresses
 
 | Address | What it's for |
@@ -144,6 +171,8 @@ Removing a member signs them out everywhere right away.
 | `/<EXPORT_KEY>/debug` | Private: lists each export received, its item count and field names |
 | `/auth/discord/login` | Starts Discord sign-in for the Locker Room |
 | `/api/game-times/public` | Public: confirmed game times shown on the schedule |
+| `/api/live` | Public to the league site: countdown, stream, chat channel, Matchup of the Week and approved highlights |
+| `/api/talk` | Trash Talk: anyone can read it, and signed-in people can post and react |
 | `/api/...` (other) | Locker Room data. Signed-in, approved members only, and only from the league site |
 
 ## Notes

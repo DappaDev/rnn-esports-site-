@@ -35,9 +35,13 @@ const SCHEMA = [
 let schemaReady = false;
 async function ensureSchema(db) {
   if (schemaReady) return;
-  await db.batch([...SCHEMA, ...MEMBER_SCHEMA].map((s) => db.prepare(s)));
-  const cols = (await db.prepare(`PRAGMA table_info(members)`).all()).results.map((c) => c.name);
-  for (const a of MEMBER_ALTERS) { const col = a.split("ADD COLUMN ")[1].split(" ")[0]; if (!cols.includes(col)) await db.prepare(a).run(); }
+  await db.batch([...SCHEMA, ...MEMBER_SCHEMA, ...FAN_SCHEMA].map((s) => db.prepare(s)));
+  const colsOf = {};
+  for (const a of MEMBER_ALTERS) {
+    const table = a.split("ALTER TABLE ")[1].split(" ")[0], col = a.split("ADD COLUMN ")[1].split(" ")[0];
+    colsOf[table] ??= (await db.prepare(`PRAGMA table_info(${table})`).all()).results.map((c) => c.name);
+    if (!colsOf[table].includes(col)) await db.prepare(a).run();
+  }
   schemaReady = true;
 }
 
@@ -236,10 +240,20 @@ const MEMBER_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS game_times (game_key TEXT PRIMARY KEY, status TEXT, starts_at TEXT, note TEXT, proposed_by TEXT, proposer_team TEXT, confirmed_by TEXT, updated TEXT)`,
 ];
 
+const FAN_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`,
+  `CREATE TABLE IF NOT EXISTS motw_votes (matchup TEXT, voter TEXT, ip TEXT, side TEXT, at TEXT, PRIMARY KEY (matchup, voter))`,
+  `CREATE TABLE IF NOT EXISTS talk (id INTEGER PRIMARY KEY AUTOINCREMENT, author_id TEXT, target TEXT, body TEXT, created TEXT)`,
+  `CREATE TABLE IF NOT EXISTS talk_reacts (post_id INTEGER, member_id TEXT, emoji TEXT, PRIMARY KEY (post_id, member_id, emoji))`,
+  `CREATE TABLE IF NOT EXISTS highlights (id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT, vid TEXT, title TEXT, submitted_by TEXT, status TEXT, created TEXT, reviewed_by TEXT)`,
+];
+
 const MEMBER_ALTERS = [
   `ALTER TABLE members ADD COLUMN override TEXT`,   // 'approved' / 'removed' set by a commissioner on the site
   `ALTER TABLE members ADD COLUMN role_site INTEGER`, // 1 when a commissioner set the role on the site
   `ALTER TABLE members ADD COLUMN gate TEXT`,       // why Discord didn't let them in: not_in_server / no_role
+  `ALTER TABLE members ADD COLUMN fan INTEGER`,     // 1 = signed in only to join the fan trash talk
+  `ALTER TABLE oauth_states ADD COLUMN purpose TEXT`, // 'fan' when sign-in started from the trash-talk board
 ];
 const SESSION_DAYS = 14;
 const TEAM_NAMES = { ARI: "Cardinals", ATL: "Falcons", BAL: "Ravens", BUF: "Bills", CAR: "Panthers", CHI: "Bears", CIN: "Bengals", CLE: "Browns", DAL: "Cowboys", DEN: "Broncos", DET: "Lions", GB: "Packers", HOU: "Texans", IND: "Colts", JAX: "Jaguars", KC: "Chiefs", LV: "Raiders", LAC: "Chargers", LAR: "Rams", MIA: "Dolphins", MIN: "Vikings", NE: "Patriots", NO: "Saints", NYG: "Giants", NYJ: "Jets", PHI: "Eagles", PIT: "Steelers", SF: "49ers", SEA: "Seahawks", TB: "Buccaneers", TEN: "Titans", WAS: "Commanders" };
@@ -290,7 +304,7 @@ function corsFor(request, env) {
 
 const publicMember = (m) => m && ({
   id: m.id, username: m.username, display: m.display || m.username, avatar: m.avatar,
-  status: m.status, role: m.role, teams: (m.teams || "").split(",").filter(Boolean), gate: m.gate || null,
+  status: m.status, role: m.role, teams: (m.teams || "").split(",").filter(Boolean), gate: m.gate || null, fan: !!m.fan,
 });
 
 async function currentMember(request, db) {
@@ -317,7 +331,7 @@ async function handleAuth(request, env, url, segs, ctx) {
   if (segs[2] === "login") {
     const state = randomToken(16);
     await db.prepare(`DELETE FROM oauth_states WHERE created < ?1`).bind(Date.now() - 600000).run();
-    await db.prepare(`INSERT INTO oauth_states VALUES (?1, ?2)`).bind(state, Date.now()).run();
+    await db.prepare(`INSERT INTO oauth_states (state, created, purpose) VALUES (?1, ?2, ?3)`).bind(state, Date.now(), url.searchParams.get("for") === "fan" ? "fan" : null).run();
     const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, redirect_uri: redirectUri, response_type: "code", scope: env.DISCORD_GUILD_ID ? "identify guilds.members.read" : "identify", state, prompt: "none" });
     return Response.redirect("https://discord.com/oauth2/authorize?" + q, 302);
   }
@@ -327,7 +341,7 @@ async function handleAuth(request, env, url, segs, ctx) {
     const code = url.searchParams.get("code"), state = url.searchParams.get("state");
     if (url.searchParams.get("error")) return back("cancelled");
     if (!code || !state) return back("missing");
-    const st = await db.prepare(`SELECT created FROM oauth_states WHERE state = ?1`).bind(state).first();
+    const st = await db.prepare(`SELECT created, purpose FROM oauth_states WHERE state = ?1`).bind(state).first();
     await db.prepare(`DELETE FROM oauth_states WHERE state = ?1`).bind(state).run();
     if (!st || st.created < Date.now() - 600000) return back("expired");
 
@@ -374,17 +388,20 @@ async function handleAuth(request, env, url, segs, ctx) {
     if (isCommish) role = "admin";
     else if (role === "admin" && !existing?.role_site) role = "member"; // lost the Discord commissioner role
     const name = serverNick || display;
+    // Fans who sign in just to talk trash don't land in the approval queue.
+    // Signing in from the Locker Room later puts them in the queue.
+    const fan = status !== "approved" && st.purpose === "fan" ? 1 : 0;
 
     if (existing) {
-      await db.prepare(`UPDATE members SET username=?2, display=?3, avatar=?4, status=?5, role=?6, last_login=?7, gate=?8, override=?9 WHERE id=?1`)
-        .bind(id, username, name, avatar, status, role, t, status === "approved" ? null : gate, override).run();
+      await db.prepare(`UPDATE members SET username=?2, display=?3, avatar=?4, status=?5, role=?6, last_login=?7, gate=?8, override=?9, fan=?10 WHERE id=?1`)
+        .bind(id, username, name, avatar, status, role, t, status === "approved" ? null : gate, override, fan).run();
     } else {
-      await db.prepare(`INSERT INTO members (id, username, display, avatar, status, role, teams, created, last_login, override, role_site, gate) VALUES (?1,?2,?3,?4,?5,?6,'',?7,?7,?8,0,?9)`)
-        .bind(id, username, name, avatar, status, role, t, override, status === "approved" ? null : gate).run();
+      await db.prepare(`INSERT INTO members (id, username, display, avatar, status, role, teams, created, last_login, override, role_site, gate, fan) VALUES (?1,?2,?3,?4,?5,?6,'',?7,?7,?8,0,?9,?10)`)
+        .bind(id, username, name, avatar, status, role, t, override, status === "approved" ? null : gate, fan).run();
     }
     // Let the commissioners' channel know about new arrivals.
-    const firstTime = !existing || (existing.status !== status && status !== "removed");
-    if (firstTime && !isCommish && status !== "removed") {
+    const firstTime = !existing || (existing.status !== status && status !== "removed") || (!!existing.fan && !fan);
+    if (firstTime && !isCommish && status !== "removed" && !fan) {
       const why = gate === "not_in_server" ? "They aren't in the RNN Discord server yet." : gate === "no_role" ? "They don't have the Coach role yet." : null;
       ctx.waitUntil(discordPost(env.WEBHOOK_SIGNUPS, status === "approved"
         ? { title: `${name} joined the Locker Room`, description: `@${username} is in. Assign their team in Commissioner tools.`, color: 0xe8ff1a, url: siteLink(env, "locker") }
@@ -418,6 +435,11 @@ async function handleMembersApi(request, env, segs, cors, ctx) {
   }
 
   const me = await currentMember(request, db);
+
+  // Fan zone: public reads, voting without an account, trash talk for anyone signed in.
+  const fanRes = await handleFanApi(request, env, route, me, ok, err);
+  if (fanRes) return fanRes;
+
   if (!me) return err("Please sign in.", 401);
 
   if (route[0] === "me" && M === "GET") return ok({ member: publicMember(me) });
@@ -594,6 +616,220 @@ async function handleMembersApi(request, env, segs, cors, ctx) {
     }
   }
   return err("Not found", 404);
+}
+
+/* =====================================================================
+ * FAN ZONE: On Air settings, Matchup of the Week, Highlight wall, Trash talk
+ * ===================================================================== */
+const REACTIONS = ["🔥", "😂", "💀", "🧢", "🐐"];
+const LIVE_WINDOW_MS = 4 * 3600e3; // a scheduled broadcast counts as live for 4 hours
+
+async function getSetting(db, key) {
+  const r = await db.prepare(`SELECT value FROM settings WHERE key = ?1`).bind(key).first();
+  try { return r ? JSON.parse(r.value) : null; } catch { return null; }
+}
+const putSetting = (db, key, val) => db.prepare(`INSERT INTO settings VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?2`).bind(key, JSON.stringify(val)).run();
+
+// Turn a pasted clip link into a platform + id. Only these shapes are accepted.
+function parseClip(raw) {
+  let u; try { u = new URL(String(raw || "").trim()); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  const host = u.hostname.toLowerCase().replace(/^(www|m)\./, ""), p = u.pathname.split("/").filter(Boolean);
+  const yt = (id) => (/^[\w-]{11}$/.test(id || "") ? { platform: "youtube", vid: id } : null);
+  if (host === "youtu.be") return yt(p[0]);
+  if (host === "youtube.com") {
+    if (p[0] === "watch") return yt(u.searchParams.get("v"));
+    if (["shorts", "live", "embed"].includes(p[0])) return yt(p[1]);
+    return null;
+  }
+  const slug = (s) => (/^[\w-]{4,100}$/.test(s || "") ? { platform: "twitchclip", vid: s } : null);
+  if (host === "clips.twitch.tv") return slug(p[0]);
+  if (host === "twitch.tv") {
+    if (p[1] === "clip") return slug(p[2]);
+    if (p[0] === "videos" && /^\d{5,15}$/.test(p[1] || "")) return { platform: "twitchvod", vid: p[1] };
+    return null;
+  }
+  if (host === "tiktok.com" && p[1] === "video" && /^\d{10,25}$/.test(p[2] || "")) return { platform: "tiktok", vid: p[2] };
+  return null;
+}
+
+async function liveState(db, env) {
+  const b = (await getSetting(db, "broadcast")) || {};
+  const at = b.at ? Date.parse(b.at) : NaN, t = Date.now();
+  const live = !!b.live || (!isNaN(at) && t >= at && t < at + LIVE_WINDOW_MS && !b.ended);
+  // Fall back to the next confirmed game for the countdown.
+  const next = await db.prepare(`SELECT game_key, starts_at FROM game_times WHERE status = 'confirmed' AND starts_at > ?1 ORDER BY starts_at LIMIT 1`).bind(new Date(t - LIVE_WINDOW_MS).toISOString()).first();
+  const m = await getSetting(db, "motw");
+  let motw = null;
+  if (m && m.a && m.b) {
+    const r = await db.prepare(`SELECT side, COUNT(*) AS n FROM motw_votes WHERE matchup = ?1 GROUP BY side`).bind(m.id).all();
+    const votes = { a: 0, b: 0 }; r.results.forEach((x) => { if (x.side in votes) votes[x.side] = x.n; });
+    motw = { id: m.id, a: m.a, b: m.b, label: m.label || "", open: !!m.open, votes };
+  }
+  const h = await db.prepare(`SELECT h.id, h.platform, h.vid, h.title, h.created, m.display, m.username FROM highlights h LEFT JOIN members m ON m.id = h.submitted_by WHERE h.status = 'approved' ORDER BY h.id DESC LIMIT 24`).all();
+  return {
+    broadcast: {
+      twitch: b.twitch || null, chatChannel: b.chatChannel || null, guild: env.DISCORD_GUILD_ID || null,
+      title: b.title || null, at: isNaN(at) ? null : new Date(at).toISOString(), live,
+    },
+    nextGame: next ? { game: next.game_key, at: next.starts_at } : null,
+    motw,
+    highlights: h.results.map((x) => ({ id: x.id, platform: x.platform, vid: x.vid, title: x.title, created: x.created, by: x.display || x.username || null })),
+  };
+}
+
+async function handleFanApi(request, env, route, me, ok, err) {
+  const db = env.DB, M = request.method, t = now();
+  const isAdmin = me && me.status === "approved" && me.role === "admin";
+
+  if (route[0] === "live" && M === "GET") return ok(await liveState(db, env));
+
+  // ---- Matchup of the Week: anyone can vote, one vote per browser ----
+  if (route[0] === "motw" && route[1] === "vote" && M === "POST") {
+    const b = await readJson(request);
+    const m = await getSetting(db, "motw");
+    if (!m || !m.open || b.matchup !== m.id) return err("Voting on this matchup is closed.", 409);
+    if (!["a", "b"].includes(b.side)) return err("Pick a side.");
+    const voter = String(b.voter || "");
+    if (!/^[a-f0-9]{32}$/.test(voter)) return err("That vote couldn't be read.");
+    const ip = await sha256((request.headers.get("cf-connecting-ip") || "") + "|" + m.id);
+    const had = await db.prepare(`SELECT side FROM motw_votes WHERE matchup = ?1 AND voter = ?2`).bind(m.id, voter).first();
+    if (!had) {
+      const same = await db.prepare(`SELECT COUNT(*) AS n FROM motw_votes WHERE matchup = ?1 AND ip = ?2`).bind(m.id, ip).first();
+      if (same.n >= 8) return err("Too many votes from this connection.", 429);
+    }
+    await db.prepare(`INSERT INTO motw_votes VALUES (?1,?2,?3,?4,?5) ON CONFLICT(matchup, voter) DO UPDATE SET side = ?4, at = ?5`).bind(m.id, voter, ip, b.side, t).run();
+    const r = await db.prepare(`SELECT side, COUNT(*) AS n FROM motw_votes WHERE matchup = ?1 GROUP BY side`).bind(m.id).all();
+    const votes = { a: 0, b: 0 }; r.results.forEach((x) => { if (x.side in votes) votes[x.side] = x.n; });
+    return ok({ votes, changed: !!had && had.side !== b.side });
+  }
+
+  // ---- Trash talk ----
+  if (route[0] === "talk") {
+    if (M === "GET" && !route[1]) {
+      const before = Math.trunc(+new URL(request.url).searchParams.get("before") || 0);
+      const rows = (await db.prepare(`SELECT t.*, m.display, m.username, m.avatar, m.teams, m.role, m.status FROM talk t LEFT JOIN members m ON m.id = t.author_id ${before > 0 ? "WHERE t.id < ?1" : "WHERE ?1 = ?1"} ORDER BY t.id DESC LIMIT 30`).bind(before).all()).results;
+      const ids = rows.map((r) => r.id);
+      const reacts = ids.length ? (await db.prepare(`SELECT post_id, emoji, member_id FROM talk_reacts WHERE post_id IN (${ids.map((_, i) => "?" + (i + 1)).join(",")})`).bind(...ids).all()).results : [];
+      return ok({
+        me: me && me.status !== "removed" ? { id: me.id, display: me.display || me.username, avatar: me.avatar, admin: isAdmin } : null,
+        reactions: REACTIONS,
+        posts: rows.map((r) => {
+          const mine = reacts.filter((x) => x.post_id === r.id);
+          const counts = {}; mine.forEach((x) => { counts[x.emoji] = (counts[x.emoji] || 0) + 1; });
+          return {
+            id: r.id, body: r.body, target: r.target || null, created: r.created,
+            author: { id: isAdmin ? r.author_id : undefined, display: r.display || r.username || "Someone", avatar: r.avatar, teams: (r.teams || "").split(",").filter(Boolean), coach: r.status === "approved", commish: r.role === "admin" && r.status === "approved" },
+            reactions: counts, reacted: me ? mine.filter((x) => x.member_id === me.id).map((x) => x.emoji) : [],
+            mine: !!me && r.author_id === me.id, canDelete: !!me && (r.author_id === me.id || isAdmin),
+          };
+        }),
+        more: rows.length === 30,
+      });
+    }
+    if (!me) return err("Sign in with Discord to join the trash talk.", 401);
+    if (me.status === "removed") return err("You can't post here.", 403);
+    if (M === "POST" && !route[1]) {
+      const b = await readJson(request);
+      const body = clean(b.body, 280).replace(/\n{3,}/g, "\n\n");
+      if (!body) return err("Say something first.");
+      const target = b.target ? String(b.target).toUpperCase() : "";
+      if (target && !TEAM_ABBRS.has(target)) return err("Pick a team from the list.");
+      const last = await db.prepare(`SELECT created FROM talk WHERE author_id = ?1 ORDER BY id DESC LIMIT 1`).bind(me.id).first();
+      if (last && Date.now() - Date.parse(last.created) < 15000) return err("Easy. Wait a few seconds before posting again.", 429);
+      const r = await db.prepare(`INSERT INTO talk (author_id, target, body, created) VALUES (?1,?2,?3,?4) RETURNING id`).bind(me.id, target || null, body, t).first();
+      return ok({ id: r.id }, 201);
+    }
+    const id = Math.trunc(+route[1]);
+    if (route[1] && route[2] === "react" && M === "POST") {
+      const emoji = String((await readJson(request)).emoji || "");
+      if (!REACTIONS.includes(emoji)) return err("Unknown reaction.");
+      const post = await db.prepare(`SELECT id FROM talk WHERE id = ?1`).bind(id).first();
+      if (!post) return err("That post was deleted.", 404);
+      const had = await db.prepare(`SELECT 1 AS x FROM talk_reacts WHERE post_id = ?1 AND member_id = ?2 AND emoji = ?3`).bind(id, me.id, emoji).first();
+      await db.prepare(had ? `DELETE FROM talk_reacts WHERE post_id = ?1 AND member_id = ?2 AND emoji = ?3` : `INSERT INTO talk_reacts VALUES (?1,?2,?3)`).bind(id, me.id, emoji).run();
+      return ok({ reacted: !had });
+    }
+    if (route[1] && M === "DELETE") {
+      const p = await db.prepare(`SELECT author_id FROM talk WHERE id = ?1`).bind(id).first();
+      if (!p) return ok({ success: true });
+      if (p.author_id !== me.id && !isAdmin) return err("You can only delete your own posts.", 403);
+      await db.batch([db.prepare(`DELETE FROM talk_reacts WHERE post_id = ?1`).bind(id), db.prepare(`DELETE FROM talk WHERE id = ?1`).bind(id)]);
+      return ok({ success: true });
+    }
+    return err("Not found", 404);
+  }
+
+  // ---- Highlights: coaches submit, the commissioner approves ----
+  if (route[0] === "highlights" && M === "POST" && !route[1]) {
+    if (!me) return err("Please sign in.", 401);
+    if (me.status !== "approved") return err("Only league coaches can submit highlights.", 403);
+    const b = await readJson(request);
+    const clip = parseClip(b.url);
+    if (!clip) return err("Paste a YouTube, Twitch or TikTok link to a single video or clip.");
+    const title = clean(b.title, 80);
+    const dup = await db.prepare(`SELECT status FROM highlights WHERE platform = ?1 AND vid = ?2 AND status != 'rejected'`).bind(clip.platform, clip.vid).first();
+    if (dup) return err(dup.status === "approved" ? "That clip is already on the wall." : "That clip is already waiting for approval.", 409);
+    if (!isAdmin) {
+      const n = await db.prepare(`SELECT COUNT(*) AS n FROM highlights WHERE submitted_by = ?1 AND status = 'pending'`).bind(me.id).first();
+      if (n.n >= 10) return err("You have 10 clips waiting already. Give the commissioner a minute.", 429);
+    }
+    const status = isAdmin ? "approved" : "pending";
+    await db.prepare(`INSERT INTO highlights (platform, vid, title, submitted_by, status, created, reviewed_by) VALUES (?1,?2,?3,?4,?5,?6,?7)`).bind(clip.platform, clip.vid, title, me.id, status, t, isAdmin ? me.id : null).run();
+    return ok({ status }, 201);
+  }
+  if (route[0] === "highlights" && route[1] === "mine" && M === "GET") {
+    if (!me || me.status !== "approved") return err("Please sign in.", 401);
+    const r = await db.prepare(`SELECT id, platform, vid, title, status, created FROM highlights WHERE submitted_by = ?1 ORDER BY id DESC LIMIT 20`).bind(me.id).all();
+    return ok({ highlights: r.results });
+  }
+
+  // ---- Commissioner: broadcast, matchup, highlight review ----
+  if (route[0] === "admin" && ["broadcast", "motw", "highlights"].includes(route[1])) {
+    if (!isAdmin) return err("Only the commissioner can do that.", 403);
+    if (route[1] === "broadcast" && M === "POST") {
+      const b = await readJson(request), cur = (await getSetting(db, "broadcast")) || {};
+      const twitch = b.twitch === undefined ? cur.twitch : clean(b.twitch, 40).replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "").replace(/\/.*$/, "").toLowerCase();
+      if (twitch && !/^[a-z0-9_]{3,25}$/.test(twitch)) return err("That doesn't look like a Twitch channel name.");
+      const chatChannel = b.chatChannel === undefined ? cur.chatChannel : clean(b.chatChannel, 30);
+      if (chatChannel && !/^\d{17,20}$/.test(chatChannel)) return err("The chat channel ID is the long number from Copy Channel ID.");
+      let at = b.at === undefined ? cur.at : b.at ? new Date(String(b.at)) : null;
+      if (at instanceof Date) { if (isNaN(at)) return err("Pick a date and time."); at = at.toISOString(); }
+      const next = { twitch: twitch || null, chatChannel: chatChannel || null, title: b.title === undefined ? cur.title || null : clean(b.title, 100) || null, at: at || null,
+        live: b.end ? false : b.live === undefined ? !!cur.live : !!b.live,
+        ended: b.end ? true : b.live ? false : at !== (cur.at || null) ? false : !!cur.ended };
+      await putSetting(db, "broadcast", next);
+      return ok({ success: true, broadcast: next });
+    }
+    if (route[1] === "motw" && M === "POST") {
+      const b = await readJson(request), cur = await getSetting(db, "motw");
+      if (b.a !== undefined || b.b !== undefined) {
+        const a = String(b.a || "").toUpperCase(), bb = String(b.b || "").toUpperCase();
+        if (!TEAM_ABBRS.has(a) || !TEAM_ABBRS.has(bb)) return err("Pick two teams.");
+        if (a === bb) return err("Pick two different teams.");
+        await putSetting(db, "motw", { id: "m" + Date.now(), a, b: bb, label: clean(b.label, 60), open: true });
+        return ok({ success: true });
+      }
+      if (!cur) return err("Set a matchup first.");
+      await putSetting(db, "motw", { ...cur, open: !!b.open });
+      return ok({ success: true });
+    }
+    if (route[1] === "highlights" && M === "GET") {
+      const r = await db.prepare(`SELECT h.*, m.display, m.username FROM highlights h LEFT JOIN members m ON m.id = h.submitted_by WHERE h.status IN ('pending','approved') ORDER BY CASE h.status WHEN 'pending' THEN 0 ELSE 1 END, h.id DESC LIMIT 60`).all();
+      return ok({ highlights: r.results.map((x) => ({ id: x.id, platform: x.platform, vid: x.vid, title: x.title, status: x.status, created: x.created, by: x.display || x.username || null })) });
+    }
+    if (route[1] === "highlights" && route[2] && M === "POST") {
+      const s = (await readJson(request)).status;
+      if (!["approved", "rejected"].includes(s)) return err("Approve or reject.");
+      await db.prepare(`UPDATE highlights SET status = ?2, reviewed_by = ?3 WHERE id = ?1`).bind(Math.trunc(+route[2]), s, me.id).run();
+      return ok({ success: true });
+    }
+    if (route[1] === "highlights" && route[2] && M === "DELETE") {
+      await db.prepare(`DELETE FROM highlights WHERE id = ?1`).bind(Math.trunc(+route[2])).run();
+      return ok({ success: true });
+    }
+  }
+  return null;
 }
 
 // Confirmed game times are public, so the schedule can show them.
