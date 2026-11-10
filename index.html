@@ -489,6 +489,9 @@ h1 .tag::after{content:"";position:absolute;left:4%;right:6%;bottom:.02em;height
 .facts{border:3px solid var(--ink);background:var(--navy-800);box-shadow:var(--shadow-hard);border-radius:0;transform:rotate(-1deg)}
 .facts b{font-family:var(--f-sign);font-weight:400;color:var(--neon)}
 .eyebrow{font-family:var(--f-sign);font-weight:400;font-size:13px;letter-spacing:.08em}
+.mast .eyebrow{font-size:clamp(16px,2.1vw,26px);letter-spacing:.06em;gap:12px;flex-wrap:wrap;line-height:1.15}
+.mast .eyebrow .stars{font-size:.85em}
+@media (max-width:820px){.mast .eyebrow{font-size:clamp(16px,4vw,26px)}}
 
 /* poster buttons */
 .cta{font-family:var(--f-sign);font-weight:400;letter-spacing:.04em;border:3px solid var(--ink);box-shadow:var(--shadow-hard);border-radius:2px;transition:transform .12s ease,box-shadow .12s ease}
