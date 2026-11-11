@@ -33,7 +33,7 @@
   function draw() { ctx.putImageData(img, 0, 0); }
 
   // ---------- emulator ----------
-  var speakers = null, timer = null, nes = null;
+  var speakers = null, timer = null, nes = null, lastCatchUp = 0;
   var romKey = null, running = false, paused = false, muted = false, started = false;
 
   function makeNes(sampleRate) {
@@ -153,8 +153,14 @@
     // Audio must be created inside a user gesture (iOS/Safari/Chrome autoplay rules).
     if (!speakers) {
       speakers = new jsnes.Speakers({
+        // The audio worklet reports an underrun every ~3 ms while its buffer is short. Answer with at
+        // most one catch-up frame per screen refresh, otherwise the game fast-forwards in bursts.
         onBufferUnderrun: function () {
-          if (running && !document.hidden) { timer.generateFrame(); timer.generateFrame(); }
+          if (!running || document.hidden) return;
+          var t = performance.now();
+          if (t - lastCatchUp < 14) return;
+          lastCatchUp = t;
+          timer.generateFrame();
         }
       });
       try {
