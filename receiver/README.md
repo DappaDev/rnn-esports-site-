@@ -161,6 +161,29 @@ Coaches paste YouTube, Twitch clip or video, or TikTok links in **Locker Room �
 ### Trash Talk
 Anyone can read it. Coaches and fans post after signing in with Discord. Fans don't land in your approval queue. Posts are limited to 280 characters, one every 15 seconds, with five emoji reactions. Commissioners can **Delete** any post or **Block** a person. Blocked people can be restored in **Commissioner → Members**.
 
+## Coaches Live (coaches stream their own games)
+
+Coaches stream on their own Twitch or YouTube channel, and the site embeds their game on the home page under **Coaches Live**. Nothing extra is needed for the basics: once you paste the new `worker.js`, it works.
+
+How it works for a coach:
+1. Start streaming from the PS5 (Create button → Broadcast), Xbox (Capture & share → Live streaming) or OBS.
+2. In the Locker Room, open **Go Live**, enter their Twitch channel or YouTube live link, pick the game and press **Go live on RNN**.
+3. Press **End stream** afterwards. A forgotten stream drops off the site after 6 hours.
+
+Only approved members can go live, and only for games their own team plays in (or a non-league game). The commissioner sees everyone who's live in the **Commissioner** tab and can **Take down** any stream.
+
+Optional settings:
+
+| Type | Name | Value |
+|---|---|---|
+| **Secret** | `WEBHOOK_STREAMS` | a Discord channel webhook: posts "Coach is live" with a link when someone goes live |
+| Variable | `TWITCH_CLIENT_ID` | from [dev.twitch.tv/console](https://dev.twitch.tv/console) → Register Your Application (category: Website Integration, OAuth redirect `http://localhost`) |
+| **Secret** | `TWITCH_CLIENT_SECRET` | from the same Twitch app (New Secret) |
+
+With the Twitch keys, the site checks Twitch every minute: streams show **Live** with a viewer count when the channel is really on air, and **Starting soon** when it isn't yet. Without them, every stream a coach starts shows as Live.
+
+Twitch's player only plays on a real web address (like the GitHub Pages site), so it won't play when you open `index.html` straight from your computer.
+
 ## Existing coaches claim their profile
 
 When an approved coach (for example, someone with the @Coach role) signs in to the Locker Room without a team, they see the 15 coach cards and tap theirs twice to confirm. Cards already claimed, or whose team is already assigned, are greyed out.
@@ -198,8 +221,9 @@ The **Join the League** page lets people claim one of the open teams. They sign 
 | `/<EXPORT_KEY>/debug` | Private: lists each export received, its item count and field names |
 | `/auth/discord/login` | Starts Discord sign-in for the Locker Room |
 | `/api/game-times/public` | Public: confirmed game times shown on the schedule |
-| `/api/live` | Public to the league site: countdown, stream, chat channel, Matchup of the Week and approved highlights |
+| `/api/live` | Public to the league site: countdown, stream, chat channel, Matchup of the Week, approved highlights and coaches who are live |
 | `/api/signups/board` | Join page: which teams are requested or filled. No contact details |
+| `/api/streams` | Go Live: approved coaches start and end their own stream; the commissioner can take any down |
 | `/api/talk` | Trash Talk: anyone can read it, and signed-in people can post and react |
 | `/api/tecmo/info`, `/api/tecmo/rom` | Tecmo Super Bowl ROM: approved members download it, commissioners upload or remove it |
 | `/api/...` (other) | Locker Room data. Signed-in, approved members only, and only from the league site |

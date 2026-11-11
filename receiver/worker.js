@@ -226,6 +226,9 @@ async function buildLeague(db) {
  *   WEBHOOK_ANNOUNCEMENTS    (secret)    channel webhook: site announcements are posted here
  *   WEBHOOK_SCHEDULE         (secret)    channel webhook: confirmed game times are posted here
  *   WEBHOOK_SIGNUPS          (secret)    channel webhook: new Locker Room sign-ins are posted here
+ *   WEBHOOK_STREAMS          (secret)    channel webhook: "coach is live" posts when a coach goes live
+ *   TWITCH_CLIENT_ID         (variable)  optional: checks coaches' Twitch channels are really live
+ *   TWITCH_CLIENT_SECRET     (secret)    optional: goes with TWITCH_CLIENT_ID
  * ===================================================================== */
 
 const MEMBER_SCHEMA = [
@@ -250,6 +253,7 @@ const FAN_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS signups (member_id TEXT PRIMARY KEY, team TEXT, coach TEXT, console TEXT, gamer_id TEXT, contact TEXT, exp TEXT, days TEXT, note TEXT, status TEXT, created TEXT, updated TEXT)`,
   `CREATE TABLE IF NOT EXISTS profile_claims (member_id TEXT PRIMARY KEY, coach_id TEXT, coach TEXT, team TEXT, status TEXT, created TEXT, updated TEXT)`,
   `CREATE TABLE IF NOT EXISTS highlights (id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT, vid TEXT, title TEXT, submitted_by TEXT, status TEXT, created TEXT, reviewed_by TEXT)`,
+  `CREATE TABLE IF NOT EXISTS streams (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id TEXT, platform TEXT, ref TEXT, game_key TEXT, title TEXT, status TEXT, started TEXT, ended TEXT, ended_by TEXT)`,
 ];
 
 const MEMBER_ALTERS = [
@@ -441,7 +445,7 @@ async function handleMembersApi(request, env, segs, cors, ctx) {
   const me = await currentMember(request, db);
 
   // Fan zone: public reads, voting without an account, trash talk for anyone signed in.
-  const fanRes = await handleFanApi(request, env, route, me, ok, err);
+  const fanRes = await handleFanApi(request, env, route, me, ok, err, ctx);
   if (fanRes) return fanRes;
   const signupRes = await handleSignupApi(request, env, route, me, ok, err, ctx);
   if (signupRes) return signupRes;
@@ -834,6 +838,66 @@ function parseClip(raw) {
   return null;
 }
 
+/* ---- Coach streams: coaches stream on Twitch or YouTube, the site embeds them ---- */
+const STREAM_MAX_MS = 6 * 3600e3; // a stream nobody ended drops off after 6 hours
+const TWITCH_RESERVED = new Set(["videos", "directory", "settings", "p", "downloads", "jobs", "search", "subscriptions", "inventory", "wallet", "drops", "turbo", "friends", "messages", "login", "signup"]);
+
+// A Twitch channel (name or link) or a YouTube live link. Nothing else is accepted.
+function parseStream(raw) {
+  const v = String(raw || "").trim();
+  if (/^@?[A-Za-z0-9_]{3,25}$/.test(v)) return { platform: "twitch", ref: v.replace(/^@/, "").toLowerCase() };
+  let u; try { u = new URL(/^https?:\/\//i.test(v) ? v : "https://" + v); } catch { return null; }
+  const host = u.hostname.toLowerCase().replace(/^(www|m)\./, ""), p = u.pathname.split("/").filter(Boolean);
+  if (host === "twitch.tv") {
+    const name = (p[0] || "").toLowerCase();
+    return /^[a-z0-9_]{3,25}$/.test(name) && !TWITCH_RESERVED.has(name) && p.length === 1 ? { platform: "twitch", ref: name } : null;
+  }
+  const yt = (id) => (/^[\w-]{11}$/.test(id || "") ? { platform: "youtube", ref: id } : null);
+  if (host === "youtu.be") return yt(p[0]);
+  if (host === "youtube.com") {
+    if (p[0] === "watch") return yt(u.searchParams.get("v"));
+    if (["live", "embed", "shorts"].includes(p[0])) return yt(p[1]);
+  }
+  return null;
+}
+const streamLink = (s) => s.platform === "twitch" ? "https://www.twitch.tv/" + s.ref : "https://www.youtube.com/watch?v=" + s.ref;
+
+// Optional: ask Twitch which channels are on air right now (needs TWITCH_CLIENT_ID + TWITCH_CLIENT_SECRET).
+let twitchToken = null, twitchCache = { at: 0, key: "", live: {} };
+async function twitchLive(env, names) {
+  if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET || !names.length) return null;
+  const key = [...names].sort().join(",");
+  if (twitchCache.key === key && Date.now() - twitchCache.at < 60000) return twitchCache.live;
+  try {
+    if (!twitchToken || twitchToken.exp < Date.now()) {
+      const r = await fetch("https://id.twitch.tv/oauth2/token", { method: "POST", body: new URLSearchParams({ client_id: env.TWITCH_CLIENT_ID, client_secret: env.TWITCH_CLIENT_SECRET, grant_type: "client_credentials" }) });
+      if (!r.ok) throw new Error("token " + r.status);
+      const j = await r.json(); twitchToken = { value: j.access_token, exp: Date.now() + (j.expires_in - 300) * 1000 };
+    }
+    const q = names.slice(0, 100).map((n) => "user_login=" + encodeURIComponent(n)).join("&");
+    const r = await fetch("https://api.twitch.tv/helix/streams?" + q, { headers: { "client-id": env.TWITCH_CLIENT_ID, authorization: "Bearer " + twitchToken.value } });
+    if (!r.ok) { if (r.status === 401) twitchToken = null; throw new Error("streams " + r.status); }
+    const live = {};
+    for (const x of (await r.json()).data || []) live[String(x.user_login).toLowerCase()] = { viewers: x.viewer_count || 0 };
+    twitchCache = { at: Date.now(), key, live };
+    return live;
+  } catch (e) { console.error("Twitch check failed", e && e.message); return null; }
+}
+
+async function activeStreams(db, env) {
+  const since = new Date(Date.now() - STREAM_MAX_MS).toISOString();
+  const rows = (await db.prepare(`SELECT s.*, m.display, m.username, m.avatar, m.teams FROM streams s JOIN members m ON m.id = s.member_id
+    WHERE s.status = 'live' AND s.started > ?1 AND m.status = 'approved' ORDER BY s.started`).bind(since).all()).results;
+  const tw = await twitchLive(env, [...new Set(rows.filter((x) => x.platform === "twitch").map((x) => x.ref))]);
+  return rows.map((x) => ({
+    id: x.id, platform: x.platform, ref: x.ref, game: x.game_key || null, title: x.title || null, started: x.started,
+    coach: { display: x.display || x.username, avatar: x.avatar, teams: (x.teams || "").split(",").filter(Boolean) },
+    // true / false when Twitch was asked, null when we can't tell (YouTube, or no Twitch keys)
+    online: x.platform === "twitch" && tw ? !!tw[x.ref] : null,
+    viewers: x.platform === "twitch" && tw && tw[x.ref] ? tw[x.ref].viewers : null,
+  }));
+}
+
 async function liveState(db, env) {
   const b = (await getSetting(db, "broadcast")) || {};
   const at = b.at ? Date.parse(b.at) : NaN, t = Date.now();
@@ -856,14 +920,67 @@ async function liveState(db, env) {
     nextGame: next ? { game: next.game_key, at: next.starts_at } : null,
     motw,
     highlights: h.results.map((x) => ({ id: x.id, platform: x.platform, vid: x.vid, title: x.title, created: x.created, by: x.display || x.username || null })),
+    streams: await activeStreams(db, env),
   };
 }
 
-async function handleFanApi(request, env, route, me, ok, err) {
+async function handleFanApi(request, env, route, me, ok, err, ctx) {
   const db = env.DB, M = request.method, t = now();
   const isAdmin = me && me.status === "approved" && me.role === "admin";
 
   if (route[0] === "live" && M === "GET") return ok(await liveState(db, env));
+
+  // ---- Coach streams: approved coaches go live, owner or commissioner ends it ----
+  if (route[0] === "streams") {
+    if (!me) return err("Please sign in.", 401);
+    if (me.status !== "approved") return err("Only league coaches can stream on the site.", 403);
+    const myTeams = (me.teams || "").split(",").filter(Boolean);
+    if (route[1] === "mine" && M === "GET") {
+      const since = new Date(Date.now() - STREAM_MAX_MS).toISOString();
+      const active = await db.prepare(`SELECT * FROM streams WHERE member_id = ?1 AND status = 'live' AND started > ?2 ORDER BY id DESC LIMIT 1`).bind(me.id, since).first();
+      const last = await db.prepare(`SELECT platform, ref FROM streams WHERE member_id = ?1 AND platform = 'twitch' ORDER BY id DESC LIMIT 1`).bind(me.id).first();
+      const ended = await db.prepare(`SELECT status, ended_by FROM streams WHERE member_id = ?1 ORDER BY id DESC LIMIT 1`).bind(me.id).first();
+      return ok({
+        active: active ? { id: active.id, platform: active.platform, ref: active.ref, game: active.game_key, title: active.title, started: active.started } : null,
+        lastChannel: last ? last.ref : null,
+        takenDown: !!ended && ended.status === "removed",
+      });
+    }
+    if (!route[1] && M === "POST") {
+      const b = await readJson(request);
+      const s = parseStream(b.channel);
+      if (!s) return err("Enter your Twitch channel name (or twitch.tv link), or paste the link to your YouTube live stream.");
+      let game = b.game ? String(b.game) : "";
+      if (game) {
+        const g = GAME_KEY.exec(game);
+        if (!g || !TEAM_ABBRS.has(g[2]) || !TEAM_ABBRS.has(g[3])) return err("Pick a game from the list.");
+        if (me.role !== "admin" && !myTeams.some((x) => x === g[2] || x === g[3])) return err("You can only stream your own games.", 403);
+      }
+      const title = clean(b.title, 100);
+      const lastStart = await db.prepare(`SELECT started FROM streams WHERE member_id = ?1 ORDER BY id DESC LIMIT 1`).bind(me.id).first();
+      if (lastStart && Date.now() - Date.parse(lastStart.started) < 20000) return err("Give it a few seconds before going live again.", 429);
+      await db.prepare(`UPDATE streams SET status = 'ended', ended = ?2, ended_by = ?1 WHERE member_id = ?1 AND status = 'live'`).bind(me.id, t).run();
+      const r = await db.prepare(`INSERT INTO streams (member_id, platform, ref, game_key, title, status, started) VALUES (?1,?2,?3,?4,?5,'live',?6) RETURNING id`)
+        .bind(me.id, s.platform, s.ref, game || null, title || null, t).first();
+      const g = GAME_KEY.exec(game);
+      const what = g ? `Week ${g[1]}: ${TEAM_NAMES[g[2]] || g[2]} @ ${TEAM_NAMES[g[3]] || g[3]}` : title || "League game";
+      if (ctx) ctx.waitUntil(discordPost(env.WEBHOOK_STREAMS, {
+        title: `🔴 ${me.display || me.username} is live`, description: `${what}${title && g ? "\n" + title : ""}\nWatch on the RNN site or [on ${s.platform === "twitch" ? "Twitch" : "YouTube"}](${streamLink(s)}).`,
+        color: 0xe91916, url: siteLink(env, "live-games"),
+      }));
+      return ok({ id: r.id, platform: s.platform, ref: s.ref }, 201);
+    }
+    if (route[1] && route[2] === "end" && M === "POST") {
+      const s = await db.prepare(`SELECT * FROM streams WHERE id = ?1`).bind(Math.trunc(+route[1])).first();
+      if (!s || s.status !== "live") return ok({ success: true });
+      const isAdmin = me.role === "admin";
+      if (s.member_id !== me.id && !isAdmin) return err("You can only end your own stream.", 403);
+      const status = s.member_id === me.id ? "ended" : "removed";
+      await db.prepare(`UPDATE streams SET status = ?2, ended = ?3, ended_by = ?4 WHERE id = ?1`).bind(s.id, status, t, me.id).run();
+      return ok({ success: true, status });
+    }
+    return err("Not found", 404);
+  }
 
   // ---- Matchup of the Week: anyone can vote, one vote per browser ----
   if (route[0] === "motw" && route[1] === "vote" && M === "POST") {

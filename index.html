@@ -777,6 +777,31 @@ html,body{overflow-x:clip}
 .tk-badge.tbadge{background:var(--c1);color:var(--on);box-shadow:inset 0 -2px 0 var(--c2)}
 /* highlight cards: a little colour on hover */
 .hl:nth-child(4n+1):hover{box-shadow:8px 8px 0 #FB4F14}.hl:nth-child(4n+2):hover{box-shadow:8px 8px 0 #69BE28}.hl:nth-child(4n+3):hover{box-shadow:8px 8px 0 #9B5CFF}.hl:nth-child(4n):hover{box-shadow:8px 8px 0 #4B92DB}
+/* coaches live: games the coaches stream on Twitch / YouTube */
+#live-games h2::before{background:#E31837;opacity:.55}
+#live-games .sub{color:#ff9aa6}
+.lv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:22px}
+.lv{background:var(--navy-800);border:3px solid var(--ink);border-top:6px solid var(--ca,var(--ink));border-radius:4px;box-shadow:6px 6px 0 var(--cb,var(--ink));overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.lv-player{position:relative;aspect-ratio:16/9;background:var(--ink)}
+.lv-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.lv-meta{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:2px 12px;padding:12px 14px}
+.lv-meta b{grid-column:2;grid-row:1;font-family:var(--f-cond);font-weight:800;font-size:19px;line-height:1.15;overflow-wrap:anywhere}
+.lv-meta .lv-by{grid-column:2;grid-row:2;font-family:var(--f-cond);font-size:14px;color:var(--ice-dim);letter-spacing:.04em}
+.lv-badge{grid-column:1;grid-row:1/span 2;align-self:center;display:inline-flex;align-items:center;gap:6px;font-family:var(--f-cond);font-weight:800;font-size:12px;letter-spacing:.16em;text-transform:uppercase;background:var(--live);color:#fff;padding:4px 9px;border-radius:3px;white-space:nowrap}
+.lv-badge i{width:8px;height:8px;border-radius:50%;background:#fff;animation:lvpulse 1.4s ease-in-out infinite}
+.lv-badge.wait{background:var(--navy-600);color:var(--ice)}
+@keyframes lvpulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.lv-badge i{animation:none}}
+.lv-out{grid-column:3;grid-row:1/span 2;font-family:var(--f-cond);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--ice);white-space:nowrap}
+@media (max-width:560px){.lv-meta{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}.lv-badge{grid-column:1;grid-row:1;justify-self:start}.lv-meta b{grid-column:1/-1;grid-row:2}.lv-meta .lv-by{grid-column:1/-1;grid-row:3}.lv-out{grid-column:2;grid-row:1}}
+.lv-empty{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;color:var(--ice-dim);margin:0}
+.nav-live{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;margin-left:5px;border-radius:10px;background:var(--live);color:#fff;font-size:12px;font-weight:800;line-height:1;vertical-align:1px}
+.nav-live[hidden]{display:none}
+.gl-now{max-width:none;border-color:var(--live);box-shadow:6px 6px 0 var(--live)}
+.gl-now h3{margin:0;display:flex;align-items:center;gap:10px;font-family:var(--f-sign);font-weight:400;font-size:22px}
+.gl-help{margin-top:18px}
+.gl-help ol,.gl-help ul{margin:10px 0 0;padding-left:22px;display:grid;gap:6px;color:var(--ice-dim)}
+.gl-help b{color:var(--ice)}
 </style>
 </head>
 <body>
@@ -788,6 +813,7 @@ html,body{overflow-x:clip}
     <div class="brand">RNN<small>E-Sports Network</small></div>
     <nav class="nav" aria-label="Sections">
       <a href="#on-air">On Air</a>
+      <a href="#live-games" style="white-space:nowrap">Live<span class="nav-live" data-live-count hidden>0</span></a>
       <a href="#talk">Trash Talk</a>
       <a href="#coaches">Coaches</a>
       <a href="#schedule" id="nav-sched">Schedule</a>
@@ -795,7 +821,7 @@ html,body{overflow-x:clip}
       <a href="#locker" id="nav-locker">Locker Room</a>
       <a href="#join" class="join-btn" id="nav-join">Join the League</a>
     </nav>
-    <details class="mnav" id="mnav"><summary class="mobile-join mobile-sched">Menu</summary><nav aria-label="Pages"><a href="#">Home</a><a href="#highlights">Highlights</a><a href="#talk">Trash Talk</a><a href="#coaches">Coaches</a><a href="#schedule">Schedule</a><a href="#league">Scores &amp; Stats</a><a href="#locker">Locker Room</a><a href="#join">Join the League</a></nav></details><a href="#join" class="mobile-join" style="margin-left:0">Join</a>
+    <details class="mnav" id="mnav"><summary class="mobile-join mobile-sched">Menu</summary><nav aria-label="Pages"><a href="#">Home</a><a href="#live-games">Coaches Live<span class="nav-live" data-live-count hidden>0</span></a><a href="#highlights">Highlights</a><a href="#talk">Trash Talk</a><a href="#coaches">Coaches</a><a href="#schedule">Schedule</a><a href="#league">Scores &amp; Stats</a><a href="#locker">Locker Room</a><a href="#join">Join the League</a></nav></details><a href="#join" class="mobile-join" style="margin-left:0">Join</a>
   </div>
 </header>
 <div class="ticker" aria-hidden="true"><div class="ticker-track">
@@ -890,6 +916,16 @@ html,body{overflow-x:clip}
           <button type="button" class="btn danger" id="pa-close" hidden>Close poll</button>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section id="live-games">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><h2>Coaches Live</h2><p class="sub" id="lv-sub">League games, streamed by the coaches</p></div>
+      </div>
+      <div class="lv-grid" id="lv-grid"></div>
+      <p class="lv-empty" id="lv-empty"><span>No coaches are streaming right now. When a coach goes live, their game shows up here.</span><a class="btn" href="#locker" data-go-live>Coaches: go live</a></p>
     </div>
   </section>
 
@@ -1000,6 +1036,7 @@ html,body{overflow-x:clip}
           <button type="button" role="tab" data-lt="news" aria-selected="true">Announcements</button>
           <button type="button" role="tab" data-lt="board" aria-selected="false">Message Board</button>
           <button type="button" role="tab" data-lt="games" aria-selected="false">My Games</button>
+          <button type="button" role="tab" data-lt="stream" aria-selected="false">Go Live</button>
           <button type="button" role="tab" data-lt="clips" aria-selected="false">Highlights</button>
           <button type="button" role="tab" data-lt="people" aria-selected="false">Members</button>
           <button type="button" role="tab" data-lt="tecmo" aria-selected="false" class="tab-tecmo"><img src="assets/tecmo-2027-cover.webp" alt="" width="20" height="28" onerror="this.remove()">Play Tecmo</button>
@@ -1050,6 +1087,38 @@ html,body{overflow-x:clip}
           <div id="clip-mine" class="lk-list"></div>
         </div>
 
+        <div class="lk-pane" data-pane="stream" hidden>
+          <div class="lk-card gl-now" id="gl-now" hidden>
+            <h3><span class="lv-badge"><i></i>Live</span><span id="gl-now-what"></span></h3>
+            <p class="lk-hint" id="gl-now-where"></p>
+            <div class="lk-row"><a class="btn" id="gl-now-link" target="_blank" rel="noopener" href="#">Open my stream ↗</a><a class="btn" href="#live-games">See it on the home page</a><button type="button" class="btn danger" id="gl-end">End stream</button></div>
+          </div>
+          <p class="msg err" id="gl-takedown" hidden>The commissioner took down your last stream. Check the league rules below before going live again.</p>
+          <form class="sheet lk-form" id="gl-form" novalidate>
+            <div class="fld"><label for="gl-channel">Your Twitch channel or YouTube live link</label><input id="gl-channel" maxlength="200" autocomplete="off" placeholder="e.g. twitch.tv/yourname, or paste your YouTube live link"></div>
+            <div class="lk-grid2">
+              <div class="fld"><label for="gl-game">Which game?</label><select id="gl-game"></select></div>
+              <div class="fld"><label for="gl-title">Title (optional)</label><input id="gl-title" maxlength="100" placeholder="e.g. Rivalry week, winner takes the division"></div>
+            </div>
+            <div class="lk-row"><span class="lk-hint">Start your stream first, then press Go live. Your game shows on the home page under Coaches Live.</span><button type="submit" class="submit">Go live on RNN</button></div>
+          </form>
+          <details class="lk-more gl-help" open>
+            <summary class="btn">How to stream your game</summary>
+            <ol>
+              <li><b>PS5:</b> link Twitch or YouTube once in Settings → Users and Accounts → Link with Other Services. Then press the Create button, choose Broadcast, and go live.</li>
+              <li><b>Xbox Series X|S:</b> press the Xbox button, go to Capture &amp; share → Live streaming, and go live on Twitch.</li>
+              <li><b>PC or capture card:</b> stream to your channel with OBS (free).</li>
+              <li>Once you're streaming, come back here, enter your channel, pick the game and press <b>Go live on RNN</b>.</li>
+              <li>Press <b>End stream</b> when the game's over. If you forget, it drops off the site after 6 hours.</li>
+            </ol>
+            <ul>
+              <li>League games and RNN content only. Keep it clean: no slurs, threats or personal stuff.</li>
+              <li>Turn off copyrighted music in your stream, or Twitch and YouTube may mute or pull it.</li>
+              <li>The commissioner can take any stream off the site.</li>
+            </ul>
+          </details>
+        </div>
+
         <div class="lk-pane" data-pane="people" hidden>
           <div id="people-list" class="lk-people"></div>
         </div>
@@ -1091,6 +1160,8 @@ html,body{overflow-x:clip}
             </div>
             <div class="lk-row"><span class="lk-hint" id="mw-state">No matchup set.</span><span class="lk-row"><button type="button" class="btn" id="mw-toggle" hidden>Close voting</button><button type="submit" class="submit">Start new vote</button></span></div>
           </form>
+          <h3 class="lk-h3">Coaches live now</h3>
+          <div id="adm-streams" class="lk-list"></div>
           <h3 class="lk-h3">Tecmo Super Bowl ROM</h3>
           <form class="lk-row tecmo-up" id="tecmo-form" novalidate>
             <span class="lk-hint" id="tecmo-adm-state">Checking…</span>
@@ -1905,7 +1976,7 @@ function openTab(t){
   LK.tab=t; lkMsg('');
   document.querySelectorAll('[data-lt]').forEach(b=>b.setAttribute('aria-selected',b.dataset.lt===t));
   document.querySelectorAll('.lk-pane').forEach(p=>p.hidden=p.dataset.pane!==t);
-  ({news:loadNews,board:loadBoard,games:loadGames,clips:loadMyClips,people:loadPeople,tecmo:loadTecmo,admin:loadAdmin})[t]();
+  ({news:loadNews,board:loadBoard,games:loadGames,stream:loadStream,clips:loadMyClips,people:loadPeople,tecmo:loadTecmo,admin:loadAdmin})[t]();
 }
 document.querySelectorAll('[data-lt]').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.lt)));
 const wrapErr=fn=>async(...a)=>{try{await fn(...a);}catch(e){lkMsg(e.message,'err');}};
@@ -2309,6 +2380,39 @@ function renderClips(){
   $('hl-grid').innerHTML=list.slice(0,FZ.clipsShown).map(clipCard).join('');
   $('hl-more').hidden=list.length<=FZ.clipsShown;
 }
+// ----- Coaches Live: games the coaches stream on Twitch / YouTube -----
+const streamEmbed=s=>s.platform==='twitch'?`https://player.twitch.tv/?channel=${encodeURIComponent(s.ref)}&parent=${encodeURIComponent(HOST)}&autoplay=false&muted=true`:`https://www.youtube-nocookie.com/embed/${encodeURIComponent(s.ref)}?autoplay=0&rel=0`;
+const streamLink=s=>s.platform==='twitch'?'https://www.twitch.tv/'+encodeURIComponent(s.ref):'https://www.youtube.com/watch?v='+encodeURIComponent(s.ref);
+const streamHead=s=>s.game?gameLabel(s.game):(s.title||'League game');
+const clock=iso=>new Date(iso).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+function streamMeta(s){
+  const badge=s.online===false?'<span class="lv-badge wait">Starting soon</span>':'<span class="lv-badge"><i></i>Live</span>';
+  const by=[esc(s.coach.display), s.game&&s.title?esc(s.title):'', s.viewers!=null?`${s.viewers} watching`:'', 'since '+clock(s.started)].filter(Boolean).join(' · ');
+  return `${badge}<b>${esc(streamHead(s))}</b><span class="lv-by">${by}</span><a class="lv-out" href="${esc(streamLink(s))}" target="_blank" rel="noopener">${s.platform==='twitch'?'Twitch':'YouTube'} ↗</a>`;
+}
+function renderStreams(){
+  const list=(FZ.live&&FZ.live.streams)||[], grid=$('lv-grid');
+  const on=list.filter(s=>s.online!==false).length;
+  $('lv-empty').hidden=list.length>0;
+  $('lv-sub').textContent=list.length?(on?`${on} game${on===1?'':'s'} streaming now`:'Coaches are about to go live'):'League games, streamed by the coaches';
+  document.querySelectorAll('[data-live-count]').forEach(el=>{el.hidden=!on; el.textContent=on;});
+  // keep players that are already showing so nobody's video restarts on refresh
+  const keep=new Set(list.map(s=>String(s.id)));
+  grid.querySelectorAll('[data-stream]').forEach(el=>{if(!keep.has(el.dataset.stream)) el.remove();});
+  list.forEach(s=>{
+    let el=grid.querySelector(`[data-stream="${s.id}"]`);
+    if(!el){
+      el=document.createElement('article'); el.className='lv'; el.dataset.stream=s.id;
+      const m=/^W\d+-(\w+)@(\w+)$/.exec(s.game||'')||[], a=m[1]||s.coach.teams[0], h=m[2]||a;
+      if(a&&TEAM[a]){el.style.setProperty('--ca',teamPop(a)); el.style.setProperty('--cb',teamPop(h));}
+      el.innerHTML=`<div class="lv-player"><iframe src="${esc(streamEmbed(s))}" title="${esc(streamHead(s))}, live stream" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe></div><div class="lv-meta"></div>`;
+      grid.appendChild(el);
+    }
+    el.querySelector('.lv-meta').innerHTML=streamMeta(s);
+  });
+}
+document.querySelectorAll('[data-go-live]').forEach(a=>a.addEventListener('click',()=>{LK.tab='stream';}));
+
 const hlDlg=$('hl-dlg');
 function openClip(h){
   if(!h) return;
@@ -2327,7 +2431,7 @@ hlDlg.addEventListener('close',()=>{$('hl-player').innerHTML='';});
 
 async function loadLive(){
   if(!API_BASE) return;
-  try{FZ.live=await fzGet('/api/live'); renderOnAir(); renderMotw(); renderClips();}
+  try{FZ.live=await fzGet('/api/live'); renderOnAir(); renderMotw(); renderClips(); renderStreams();}
   catch(_){ if(!FZ.live){$('poll-empty').textContent='The fan poll can’t be reached right now.';} }
 }
 
@@ -2422,6 +2526,49 @@ $('clip-form').addEventListener('submit',wrapErr(async e=>{e.preventDefault();
   $('clip-form').reset(); lkMsg(r.status==='approved'?'Clip is on the wall.':'Clip sent. It shows on the wall once the commissioner approves it.','ok'); loadMyClips(); if(r.status==='approved') loadLive();
 }));
 
+// ----- Locker Room: Go Live tab -----
+const GL={active:null};
+function myGameOptions(sel){
+  const mine=LK.me.teams, all=LK.me.role==='admin'&&!mine.length;
+  const list=GAMES.filter(g=>all||mine.includes(g.a)||mine.includes(g.h));
+  return '<option value="">Not a league game (scrimmage, practice)</option>'+list.map(g=>{const k=`W${g.w}-${g.a}@${g.h}`; return `<option value="${k}"${k===sel?' selected':''}>${esc(gameLabel(k))}</option>`;}).join('');
+}
+function guessGame(){ // the confirmed game closest to right now, within 6 hours
+  let best=null, bd=6*3600e3; const mine=LK.me.teams;
+  Object.values(LK.games||{}).forEach(g=>{
+    if(g.status!=='confirmed') return;
+    const m=/^W\d+-(\w+)@(\w+)$/.exec(g.game)||[];
+    if(mine.length&&!mine.includes(m[1])&&!mine.includes(m[2])) return;
+    const d=Math.abs(Date.parse(g.startsAt)-Date.now()); if(d<bd){bd=d; best=g.game;}
+  });
+  return best;
+}
+const loadStream=wrapErr(async()=>{
+  const [mine,gt]=await Promise.all([api('/api/streams/mine'),api('/api/game-times')]);
+  LK.games=Object.fromEntries(gt.games.map(g=>[g.game,g]));
+  const a=GL.active=mine.active;
+  $('gl-now').hidden=!a; $('gl-form').hidden=!!a;
+  $('gl-takedown').hidden=!(mine.takenDown&&!a);
+  if(a){
+    $('gl-now-what').textContent=a.game?gameLabel(a.game):(a.title||'League game');
+    $('gl-now-where').textContent=`${a.platform==='twitch'?'twitch.tv/'+a.ref:'YouTube'} · live on RNN since ${clock(a.started)}`;
+    $('gl-now-link').href=streamLink(a);
+  } else {
+    if(!$('gl-channel').value&&mine.lastChannel) $('gl-channel').value=mine.lastChannel;
+    $('gl-game').innerHTML=myGameOptions(guessGame());
+  }
+});
+$('gl-form').addEventListener('submit',wrapErr(async e=>{e.preventDefault();
+  const channel=$('gl-channel').value.trim();
+  if(!channel){lkMsg('Enter your Twitch channel or paste your YouTube live link.','err'); $('gl-channel').focus(); return;}
+  await api('/api/streams',{method:'POST',body:{channel,game:$('gl-game').value,title:$('gl-title').value.trim()}});
+  $('gl-title').value=''; lkMsg('You’re live on RNN. Your game is on the home page under Coaches Live.','ok'); loadStream(); loadLive();
+}));
+$('gl-end').addEventListener('click',wrapErr(async()=>{
+  if(!GL.active) return;
+  await api(`/api/streams/${GL.active.id}/end`,{method:'POST'}); lkMsg('Stream ended. Good game.','ok'); loadStream(); loadLive();
+}));
+
 // ----- Locker Room: commissioner On Air + Matchup + clip review -----
 const teamOpts=sel=>[...TEAMS].sort((a,b)=>a.full.localeCompare(b.full)).map(t=>`<option value="${t.ab}"${t.ab===sel?' selected':''}>${esc(t.full)}${coachOf(t.ab)?' · '+esc(coachOf(t.ab)):''}</option>`).join('');
 const toLocalInput=iso=>{if(!iso) return ''; const d=new Date(iso); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;};
@@ -2430,7 +2577,9 @@ async function loadAdminFan(){
     const [L,{highlights},{signups}]=await Promise.all([fzGet('/api/live'),api('/api/admin/highlights'),api('/api/admin/signups')]);
     const waiting=signups.filter(x=>x.status==='pending').length;
     $('adm-signups').innerHTML=waiting?`<b>${waiting}</b> waiting for review. <a href="#join">Review them on the Join page</a>.`:'No new sign-ups. They show on the <a href="#join">Join page</a> when someone claims a team.';
-    FZ.live=L; renderOnAir(); renderMotw(); renderClips();
+    FZ.live=L; renderOnAir(); renderMotw(); renderClips(); renderStreams();
+    const ss=L.streams||[];
+    $('adm-streams').innerHTML=ss.length?ss.map(s=>`<div class="lk-person row">${avatarHtml(s.coach,40)}<span><b>${esc(s.coach.display)} · ${esc(streamHead(s))}</b><span class="lk-meta"><a href="${esc(streamLink(s))}" target="_blank" rel="noopener">${s.platform==='twitch'?'twitch.tv/'+esc(s.ref):'YouTube'} ↗</a> · live since ${clock(s.started)}</span></span><button type="button" class="btn danger" data-stream-down="${s.id}">Take down</button></div>`).join(''):'<p class="none">Nobody is streaming right now.</p>';
     const b=L.broadcast;
     if(!$('bc-form').contains(document.activeElement)){
       $('bc-twitch').value=b.twitch||''; $('bc-chat').value=b.chatChannel||''; $('bc-title').value=b.title||''; $('bc-at').value=toLocalInput(b.at);
@@ -2467,6 +2616,11 @@ $('adm-clips').addEventListener('click',wrapErr(async e=>{
   if(no) await api('/api/admin/highlights/'+no.dataset.clipNo,{method:'POST',body:{status:'rejected'}});
   if(del) await api('/api/admin/highlights/'+del.dataset.clipDel,{method:'DELETE'});
   if(ok||no||del){lkMsg(ok?'Clip approved.':no?'Clip rejected.':'Clip taken down.','ok'); loadAdminFan();}
+}));
+
+$('adm-streams').addEventListener('click',wrapErr(async e=>{
+  const b=e.target.closest('[data-stream-down]'); if(!b) return;
+  await api(`/api/streams/${b.dataset.streamDown}/end`,{method:'POST'}); lkMsg('Stream taken off the site.','ok'); loadAdminFan();
 }));
 
 // keep the home page fresh while it's open
