@@ -715,6 +715,25 @@ html,body{overflow-x:clip}
 .claim-wait{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .claim-wait img{width:120px;border:3px solid var(--team);border-radius:4px}
 .claim-wait p{margin:0;flex:1 1 220px}
+/* Tecmo Bowl cover buttons */
+.tecmo-cta{display:flex;align-items:center;gap:18px;margin:0 0 20px;padding:14px;max-width:760px;text-decoration:none;color:var(--ice);
+  background:linear-gradient(110deg,#0b3d91 0,#14222f 55%,#7a0a0a 100%);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--neon);border-radius:4px;transition:transform .15s ease,box-shadow .15s ease}
+.tecmo-cta:hover{transform:translate(-2px,-2px);box-shadow:9px 9px 0 var(--neon)}
+.tecmo-cta:focus-visible{outline:3px solid var(--ice);outline-offset:3px}
+.tecmo-cta img{width:132px;height:auto;aspect-ratio:320/448;object-fit:cover;flex:0 0 auto;border:3px solid var(--ink);border-radius:3px;box-shadow:4px 4px 0 var(--ink);transform:rotate(-3deg)}
+.tc-txt{display:grid;gap:6px;min-width:0}
+.tc-kicker{font-family:var(--f-sign);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--neon)}
+.tecmo-cta b{font-family:var(--f-sign);font-weight:400;font-size:clamp(24px,3.4vw,36px);line-height:1.05}
+.tc-sub{color:var(--ice-dim);font-size:15px}
+.tc-go{justify-self:start;font-family:var(--f-sign);font-size:15px;background:var(--neon);color:var(--ink);padding:9px 16px;border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);margin-top:4px}
+@media (max-width:520px){.tecmo-cta{gap:12px;padding:12px}.tecmo-cta img{width:96px}.tc-sub{font-size:14px}}
+@media (prefers-reduced-motion:reduce){.tecmo-cta,.tecmo-cta:hover{transition:none;transform:none}}
+.tab-tecmo{display:inline-flex;align-items:center;gap:7px}
+.tab-tecmo img{width:16px;height:22px;object-fit:cover;border-radius:2px;border:1px solid var(--ink)}
+.tecmo-cover{display:grid;justify-items:center;gap:8px;text-decoration:none}
+.tecmo-cover img{width:150px;height:auto;aspect-ratio:320/448;border:3px solid var(--ink);border-radius:3px;box-shadow:5px 5px 0 var(--neon);transition:transform .15s ease}
+.tecmo-cover:hover img{transform:rotate(-2deg) scale(1.03)}
+.tecmo-cover span{font-family:var(--f-sign);font-size:15px;background:var(--neon);color:var(--ink);padding:8px 14px;border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
 .lk-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
 @media (max-width:640px){.lk-grid2{grid-template-columns:1fr}}
 .bc-state{font-family:var(--f-sign);font-size:13px;padding:4px 10px;border:2px solid var(--ink);background:var(--navy-600);color:var(--ice-dim)}
@@ -973,13 +992,17 @@ html,body{overflow-x:clip}
           <div class="claim-grid" id="claim-grid"></div>
           <div class="claim-wait" id="claim-wait" hidden></div>
         </section>
+        <a class="tecmo-cta" id="tecmo-cta" href="tecmo/">
+          <img src="assets/tecmo-2027-cover.webp" alt="" width="320" height="448" onerror="this.hidden=true">
+          <span class="tc-txt"><span class="tc-kicker">Members only · Play now</span><b>Tecmo Super Bowl 2027</b><span class="tc-sub" id="tecmo-cta-sub">The league build, right in your browser on phone, tablet or computer.</span><span class="tc-go" id="tecmo-cta-go">Play now <span aria-hidden="true">▶</span></span></span>
+        </a>
         <div class="weeks lk-tabs" role="tablist" aria-label="Locker Room sections">
           <button type="button" role="tab" data-lt="news" aria-selected="true">Announcements</button>
           <button type="button" role="tab" data-lt="board" aria-selected="false">Message Board</button>
           <button type="button" role="tab" data-lt="games" aria-selected="false">My Games</button>
           <button type="button" role="tab" data-lt="clips" aria-selected="false">Highlights</button>
           <button type="button" role="tab" data-lt="people" aria-selected="false">Members</button>
-          <button type="button" role="tab" data-lt="tecmo" aria-selected="false">Play Tecmo</button>
+          <button type="button" role="tab" data-lt="tecmo" aria-selected="false" class="tab-tecmo"><img src="assets/tecmo-2027-cover.webp" alt="" width="20" height="28" onerror="this.remove()">Play Tecmo</button>
           <button type="button" role="tab" data-lt="admin" aria-selected="false" hidden id="lk-admin-tab">Commissioner</button>
         </div>
         <p class="msg" id="lk-msg" role="status"></p>
@@ -1037,7 +1060,7 @@ html,body{overflow-x:clip}
               <h3 class="lk-h3">Tecmo Super Bowl</h3>
               <p class="lk-hint" id="tecmo-status">Checking for the league ROM…</p>
             </div>
-            <a class="submit tecmo-play" id="tecmo-play" href="tecmo/" hidden>Play now <span aria-hidden="true">▶</span></a>
+            <a class="tecmo-play tecmo-cover" id="tecmo-play" href="tecmo/" hidden><img src="assets/tecmo-2027-cover.webp" alt="Tecmo Super Bowl 2027 cover" width="320" height="448" onerror="this.hidden=true"><span>Play now <span aria-hidden="true">▶</span></span></a>
           </div>
           <div class="tecmo-how">
             <div><h4>Phone &amp; tablet</h4><p class="lk-hint">On-screen D-pad, A, B, Start and Select show up automatically. Turn your phone sideways for the biggest picture.</p></div>
@@ -1812,7 +1835,7 @@ function showLocker(){
     $('lk-admin-tab').hidden=me.role!=='admin';
     $('ann-form').hidden=me.role!=='admin';
     openTab(LK.tab);
-    loadClaim();
+    loadClaim(); refreshTecmoCta();
   }
 }
 /* ---- Existing coaches: claim your coach profile (commissioner confirms) ---- */
@@ -1984,6 +2007,14 @@ const loadPeople=wrapErr(async()=>{
 const teamOptions=sel=>'<option value="">No team</option>'+[...TEAMS].sort((a,b)=>a.full.localeCompare(b.full)).map(t=>`<option value="${t.ab}"${t.ab===sel?' selected':''}>${t.full}</option>`).join('');
 // Tecmo Super Bowl: the player lives in tecmo/ and downloads the ROM with the Locker Room sign-in.
 const kb=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.round(n/1024)+' KB';
+// Big cover button above the tabs
+async function refreshTecmoCta(){
+  try{const {rom}=await api('/api/tecmo/info'); LK.tecmoRom=!!rom;
+    $('tecmo-cta-sub').textContent=rom?'The league build, right in your browser on phone, tablet or computer.':'The league build is coming soon. Tap for controls and how it works.';
+    $('tecmo-cta-go').innerHTML=rom?'Play now <span aria-hidden="true">▶</span>':'See how it works';
+  }catch(_){}
+}
+$('tecmo-cta').addEventListener('click',e=>{ if(LK.tecmoRom) return; e.preventDefault(); openTab('tecmo'); $('tecmo-cta').scrollIntoView({block:'start'}); });
 const loadTecmo=wrapErr(async()=>{
   const {rom}=await api('/api/tecmo/info');
   $('tecmo-play').hidden=!rom;
