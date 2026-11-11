@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14222f">
+<link rel="icon" href="../assets/favicon-32.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<meta name="robots" content="noindex, nofollow">
+<title>Tecmo Super Bowl · RNN E-Sports</title>
+<style>
+  :root {
+    --bg: #0d1824; --panel: #14222f; --line: rgba(143,193,227,.18); --text: #eef3f4; --muted: #a9b8c4; --sky: #8fc1e3;
+    --accent: #e5484d; --btn: #25394c; --btn-on: #3d5a75; --ab: #c4282e; --ab-on: #ff5a60;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+  /* top bar */
+  .bar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex: none; }
+  .bar h1 { font-size: 15px; margin: 0 auto 0 4px; font-weight: 650; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .back { width: 32px; height: 36px; display: grid; place-items: center; color: var(--sky); flex: none; }
+  .back svg { width: 22px; height: 22px; fill: currentColor; }
+  .ib { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .ib:hover { background: var(--btn); }
+  .ib svg { width: 20px; height: 20px; fill: currentColor; }
+  .tb { height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  .tb:hover { background: var(--btn); }
+  .ib, .tb { flex: none; }
+  .ib[hidden], .tb[hidden] { display: none; }
+
+  /* game screen */
+  #stage { position: relative; flex: 1 1 auto; min-height: 0; display: grid; place-items: center; background: #000; touch-action: none; }
+  #screen { width: 256px; height: 240px; image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+
+  #overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; background: rgba(0,0,0,.62); text-align: center; padding: 20px; }
+  #overlay[hidden] { display: none; }
+  #overlay-msg { font-size: 17px; max-width: 30ch; }
+  #overlay.error #overlay-msg { color: #ffb4b4; }
+  #overlay-btn { font: inherit; font-size: 17px; font-weight: 650; padding: 12px 28px; border-radius: 999px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+  #overlay-btn[hidden], #overlay-msg[hidden] { display: none; }
+
+  #toast { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: rgba(20,22,26,.92); border: 1px solid var(--line); padding: 6px 14px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+
+  /* touch pad — hidden unless body.touch. --ctrl (px) is set by player.js from the free space. */
+  #pad { display: none; touch-action: none; --ctrl: 170px; }
+  body.touch #pad { display: grid; }
+  #pad { flex: none; grid-template-columns: 1fr 1fr; grid-template-areas: "sel start" "dpad ab";
+    align-items: center; row-gap: 10px; padding: 10px 18px 18px; background: var(--bg); }
+  .p-sel { grid-area: sel; justify-self: end; margin-right: 8px; } .p-start { grid-area: start; justify-self: start; margin-left: 8px; }
+  .dpad { grid-area: dpad; justify-self: start; position: relative; width: var(--ctrl); aspect-ratio: 1; }
+  .dpad span { position: absolute; background: var(--btn); }
+  .dpad .dp-u, .dpad .dp-d { left: 33.3%; width: 33.4%; height: 36%; }
+  .dpad .dp-u { top: 0; border-radius: 8px 8px 2px 2px; } .dpad .dp-d { bottom: 0; border-radius: 2px 2px 8px 8px; }
+  .dpad .dp-l, .dpad .dp-r { top: 33.3%; height: 33.4%; width: 36%; }
+  .dpad .dp-l { left: 0; border-radius: 8px 2px 2px 8px; } .dpad .dp-r { right: 0; border-radius: 2px 8px 8px 2px; }
+  .dpad .dp-c { left: 33.3%; top: 33.3%; width: 33.4%; height: 33.4%; }
+  .dpad span.on { background: var(--btn-on); }
+  .pill { width: 72px; height: 28px; border-radius: 999px; background: var(--btn); font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--muted); display: grid; place-items: center; }
+  .pill.on { background: var(--btn-on); color: var(--text); }
+  /* A/B: B low-left, A high-right, like the NES pad tilted for a right thumb */
+  .ab { grid-area: ab; justify-self: end; position: relative; width: var(--ctrl); aspect-ratio: 1; }
+  .ab .btn { position: absolute; width: 47%; aspect-ratio: 1; border-radius: 50%; background: var(--ab); display: grid; place-items: center;
+    font-weight: 800; font-size: 20px; color: rgba(255,255,255,.85); box-shadow: inset 0 -4px 0 rgba(0,0,0,.3); }
+  .ab .btn[data-btn="b"] { left: 0; bottom: 14%; }
+  .ab .btn[data-btn="a"] { right: 0; top: 14%; }
+  .ab .btn.on { background: var(--ab-on); box-shadow: none; }
+
+  /* landscape: controls sit in the side columns beside the game */
+  @media (orientation: landscape) {
+    body.touch #pad { position: absolute; left: 0; right: 0; bottom: 0; top: 52px; background: transparent; pointer-events: none;
+      grid-template-rows: 1fr auto; grid-template-areas: "sel start" "dpad ab"; align-items: end;
+      padding: 0 calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
+    body.touch #pad > * { pointer-events: auto; }
+    .p-sel { justify-self: start; margin: 0 0 0 calc(var(--ctrl) / 2 - 36px); }
+    .p-start { justify-self: end; margin: 0 calc(var(--ctrl) / 2 - 36px) 0 0; }
+  }
+
+  /* help */
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; max-width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h2 { margin: 0 0 10px; font-size: 17px; } dialog h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  dialog table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  dialog td { padding: 4px 0; border-bottom: 1px solid var(--line); } dialog td:last-child { text-align: right; color: var(--muted); }
+  kbd { font: 12px ui-monospace, Menlo, monospace; background: var(--btn); border-radius: 4px; padding: 1px 6px; }
+  dialog p { color: var(--muted); font-size: 13px; }
+  @media (max-width: 520px) { .tb { height: 30px; padding: 0 7px; font-size: 12px; } .bar { gap: 2px; padding: 6px; } .ib { width: 32px; } .bar h1 { font-size: 13px; min-width: 0; } }
+</style>
+</head>
+<!-- The ROM comes from the league server (data-api) using the Locker Room sign-in.
+     Commissioners upload it in Locker Room → Commissioner → Tecmo Super Bowl ROM. -->
+<body data-api="https://rnn-receiver.dtorregano.workers.dev" data-signin="../#locker" data-title="Tecmo Super Bowl · RNN">
+<div id="app">
+  <header class="bar">
+    <a class="back" href="../#locker" aria-label="Back to the Locker Room" title="Locker Room"><svg viewBox="0 0 24 24"><path d="M15.5 4.5 8 12l7.5 7.5-1.4 1.4L5.2 12l8.9-8.9z"/></svg></a>
+    <h1 id="title">Tecmo Super Bowl</h1>
+    <button class="tb" id="btn-save" title="Save state (F2)">Save</button>
+    <button class="tb" id="btn-load" title="Load state (F4)">Load</button>
+    <button class="ib" id="btn-pause" aria-label="Pause"></button>
+    <button class="ib" id="btn-reset" aria-label="Reset" title="Reset"><svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.6 4.7l1.9.6A5 5 0 1 0 12 7v3L7.5 6 12 2z"/></svg></button>
+    <button class="ib" id="btn-mute" aria-label="Mute"></button>
+    <button class="ib" id="btn-pad" aria-label="On-screen controls" title="On-screen controls"><svg viewBox="0 0 24 24"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg></button>
+    <button class="ib" id="btn-fs" aria-label="Fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg></button>
+    <button class="ib" id="btn-help" aria-label="Controls help" title="Controls"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 16h-2v-2h2zm2.1-7.7-.9.9c-.7.7-1.2 1.3-1.2 2.8h-2v-.5c0-1.1.5-2.1 1.2-2.8l1.2-1.3A2 2 0 1 0 10 8H8a4 4 0 1 1 7.1 2.3z"/></svg></button>
+  </header>
+
+  <main id="stage">
+    <canvas id="screen" width="256" height="240" aria-label="Game screen"></canvas>
+    <div id="overlay"><div id="overlay-msg">Loading…</div><button id="overlay-btn" hidden></button></div>
+    <div id="toast" role="status"></div>
+  </main>
+
+  <div id="pad" aria-hidden="true">
+    <div class="dpad" data-dpad><span class="dp-u"></span><span class="dp-d"></span><span class="dp-l"></span><span class="dp-r"></span><span class="dp-c"></span></div>
+    <div class="pill p-sel" data-btn="select">SELECT</div><div class="pill p-start" data-btn="start">START</div>
+    <div class="ab"><div class="btn" data-btn="b">B</div><div class="btn" data-btn="a">A</div></div>
+  </div>
+</div>
+
+<input type="file" id="file" accept=".nes" hidden>
+
+<dialog id="help">
+  <h2>Controls</h2>
+  <h3>Keyboard · Player 1</h3>
+  <table>
+    <tr><td>Move</td><td><kbd>Arrows</kbd> or <kbd>W A S D</kbd></td></tr>
+    <tr><td>A (snap, dive, tackle, pass)</td><td><kbd>X</kbd></td></tr>
+    <tr><td>B (switch player, select receiver)</td><td><kbd>Z</kbd></td></tr>
+    <tr><td>Start / Select</td><td><kbd>Enter</kbd> / <kbd>Shift</kbd></td></tr>
+  </table>
+  <h3>Keyboard · Player 2</h3>
+  <table>
+    <tr><td>Move</td><td><kbd>I J K L</kbd></td></tr>
+    <tr><td>A / B</td><td><kbd>.</kbd> / <kbd>,</kbd></td></tr>
+    <tr><td>Start / Select</td><td><kbd>]</kbd> / <kbd>[</kbd></td></tr>
+  </table>
+  <h3>Player menu</h3>
+  <table>
+    <tr><td>Pause</td><td><kbd>P</kbd> or <kbd>Esc</kbd></td></tr>
+    <tr><td>Save / load state</td><td><kbd>F2</kbd> / <kbd>F4</kbd></td></tr>
+  </table>
+  <h3>Touch &amp; controllers</h3>
+  <p>On phones and tablets the on-screen pad appears automatically; slide your thumb across the D-pad or between A and B. Turn it on or off with the ✚ button. Bluetooth or USB controllers work too: the first is Player 1, the second is Player 2.</p>
+  <p>Season progress saves automatically in this browser. Save/Load keeps one quick snapshot per device.</p>
+  <form method="dialog"><button class="tb" id="help-close">Close</button></form>
+</dialog>
+
+<script src="jsnes-core.min.js"></script>
+<script src="player.js"></script>
+</body>
+</html>

@@ -180,6 +180,14 @@ The **Join the League** page lets people claim one of the open teams. They sign 
 - Applicants can change or withdraw their request until it's approved.
 - An approved coach also needs a coach card on the home page. Send the card to Claude to add it.
 
+## Tecmo Super Bowl ROM
+
+**Play Tecmo** in the Locker Room needs the updated `worker.js`. Paste it in and deploy it as in step C. No new settings are needed; the ROM is stored in the same D1 database.
+
+1. Open **Locker Room → Commissioner → Tecmo Super Bowl ROM**, choose the league `.nes` file and click **Upload ROM**. The limit is 1 MB, and a Tecmo ROM is about 384 KB.
+2. Approved members can now open **Play Tecmo → Play now**. Signed-out, pending and removed members can't download it.
+3. To ship a new build, upload it again. It replaces the old one.
+
 ## Addresses
 
 | Address | What it's for |
@@ -193,6 +201,7 @@ The **Join the League** page lets people claim one of the open teams. They sign 
 | `/api/live` | Public to the league site: countdown, stream, chat channel, Matchup of the Week and approved highlights |
 | `/api/signups/board` | Join page: which teams are requested or filled. No contact details |
 | `/api/talk` | Trash Talk: anyone can read it, and signed-in people can post and react |
+| `/api/tecmo/info`, `/api/tecmo/rom` | Tecmo Super Bowl ROM: approved members download it, commissioners upload or remove it |
 | `/api/...` (other) | Locker Room data. Signed-in, approved members only, and only from the league site |
 
 ## Notes

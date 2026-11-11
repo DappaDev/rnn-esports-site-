@@ -238,6 +238,8 @@ const MEMBER_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS threads (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, body TEXT, author_id TEXT, created TEXT, last_activity TEXT, reply_count INTEGER DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS replies (id INTEGER PRIMARY KEY AUTOINCREMENT, thread_id INTEGER, body TEXT, author_id TEXT, created TEXT)`,
   `CREATE TABLE IF NOT EXISTS game_times (game_key TEXT PRIMARY KEY, status TEXT, starts_at TEXT, note TEXT, proposed_by TEXT, proposer_team TEXT, confirmed_by TEXT, updated TEXT)`,
+  // Tecmo Super Bowl player: the league ROM, one row, served only to approved members.
+  `CREATE TABLE IF NOT EXISTS tecmo_rom (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT, data BLOB, size INTEGER, uploaded_by TEXT, updated TEXT)`,
 ];
 
 const FAN_SCHEMA = [
@@ -455,6 +457,9 @@ async function handleMembersApi(request, env, segs, cors, ctx) {
 
   if (me.status !== "approved") return err(me.status === "removed" ? "Your access was removed by the commissioner." : "Your account is waiting for the commissioner's approval.", 403);
   const isAdmin = me.role === "admin";
+
+  // ---- Tecmo Super Bowl player (members only) ----
+  if (route[0] === "tecmo") return handleTecmo(request, env, route, me, isAdmin, cors, ok, err);
   const myTeams = (me.teams || "").split(",").filter(Boolean);
   const authorMap = async (ids) => {
     const uniq = [...new Set(ids.filter(Boolean))];
@@ -1012,6 +1017,72 @@ async function handleFanApi(request, env, route, me, ok, err) {
 async function publicGameTimes(db) {
   const r = await db.prepare(`SELECT game_key, starts_at FROM game_times WHERE status = 'confirmed'`).all();
   return Object.fromEntries(r.results.map((x) => [x.game_key, x.starts_at]));
+}
+
+/* =====================================================================
+ * TECMO SUPER BOWL PLAYER
+ * The Locker Room has a "Play Tecmo" tab that opens tecmo/ on the league site.
+ * The game files there are public, but the ROM is not: a commissioner uploads it
+ * in Commissioner tools, it's kept in D1, and only approved members can download it.
+ *   GET    /api/tecmo/info -> { rom: { name, size, updated, uploadedBy } | null }
+ *   GET    /api/tecmo/rom  -> the ROM bytes (approved members)
+ *   POST   /api/tecmo/rom?name=<file name>  body = raw .nes bytes (commissioners)
+ *   DELETE /api/tecmo/rom  (commissioners)
+ * ===================================================================== */
+const TECMO_MAX = 1024 * 1024; // a Tecmo Super Bowl ROM is ~384 KB; D1 rows top out at 2 MB
+
+async function handleTecmo(request, env, route, me, isAdmin, cors, ok, err) {
+  const db = env.DB, M = request.method;
+  if (route[1] === "info" && M === "GET") {
+    const r = await db.prepare(`SELECT name, size, updated, uploaded_by FROM tecmo_rom WHERE id = 1`).first();
+    let by = null;
+    if (r && r.uploaded_by) {
+      const u = await db.prepare(`SELECT display, username FROM members WHERE id = ?1`).bind(r.uploaded_by).first();
+      by = u ? u.display || u.username : null;
+    }
+    return ok({ rom: r ? { name: r.name, size: r.size, updated: r.updated, uploadedBy: by } : null });
+  }
+  if (route[1] !== "rom") return err("Not found", 404);
+
+  if (M === "GET") {
+    const r = await db.prepare(`SELECT name, data, updated FROM tecmo_rom WHERE id = 1`).first();
+    if (!r || !r.data) return err("The commissioner hasn't uploaded the league ROM yet.", 404);
+    const bytes = r.data instanceof ArrayBuffer ? new Uint8Array(r.data) : Uint8Array.from(r.data);
+    return new Response(bytes, {
+      headers: {
+        ...cors,
+        "content-type": "application/octet-stream",
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+        "x-rom-updated": String(r.updated || ""),
+        "access-control-expose-headers": "x-rom-updated",
+      },
+    });
+  }
+
+  if (!isAdmin) return err("Only commissioners can change the league ROM.", 403);
+
+  if (M === "DELETE") {
+    await db.prepare(`DELETE FROM tecmo_rom WHERE id = 1`).run();
+    return ok({ success: true });
+  }
+
+  if (M === "POST") {
+    const len = +(request.headers.get("content-length") || 0);
+    if (len > TECMO_MAX) return err("That file is too big for a Tecmo ROM (1 MB max).", 413);
+    const buf = await request.arrayBuffer();
+    const b = new Uint8Array(buf);
+    if (b.length > TECMO_MAX) return err("That file is too big for a Tecmo ROM (1 MB max).", 413);
+    // iNES header: "NES" followed by 0x1A.
+    if (b.length < 16 + 16384 || b[0] !== 0x4e || b[1] !== 0x45 || b[2] !== 0x53 || b[3] !== 0x1a)
+      return err("That doesn't look like an NES ROM (.nes file).");
+    const name = clean(new URL(request.url).searchParams.get("name") || "league.nes", 120);
+    await db.prepare(`INSERT INTO tecmo_rom (id, name, data, size, uploaded_by, updated) VALUES (1, ?1, ?2, ?3, ?4, ?5)
+      ON CONFLICT(id) DO UPDATE SET name = ?1, data = ?2, size = ?3, uploaded_by = ?4, updated = ?5`)
+      .bind(name, buf, b.length, me.id, now()).run();
+    return ok({ success: true, rom: { name, size: b.length, updated: now() } });
+  }
+  return err("Not found", 404);
 }
 
 export default {

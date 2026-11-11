@@ -229,6 +229,13 @@ footer img{width:28px;height:28px}
 .lk-me>div{display:grid;gap:4px;min-width:0}
 .lk-me .btn{margin-left:auto}
 .lk-tabs{margin-bottom:10px}
+.tecmo-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border:1px solid var(--line);background:var(--navy-800);border-radius:4px;padding:18px 20px}
+.tecmo-hero .lk-h3{margin:0 0 4px}
+.tecmo-play{text-decoration:none;display:inline-flex;gap:10px;align-items:center}
+.tecmo-how{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.tecmo-how>div{border:1px solid var(--line);border-radius:4px;padding:14px 16px;background:var(--navy-900)}
+.tecmo-how h4{margin:0 0 6px;font-family:var(--f-cond);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:14px;color:var(--sky)}
+.tecmo-up input[type=file]{font:inherit;font-size:14px;color:var(--ice-dim);max-width:230px}
 .lk-pane{display:grid;gap:16px}
 .lk-list{display:grid;gap:14px}
 .lk-form{max-width:760px}
@@ -972,6 +979,7 @@ html,body{overflow-x:clip}
           <button type="button" role="tab" data-lt="games" aria-selected="false">My Games</button>
           <button type="button" role="tab" data-lt="clips" aria-selected="false">Highlights</button>
           <button type="button" role="tab" data-lt="people" aria-selected="false">Members</button>
+          <button type="button" role="tab" data-lt="tecmo" aria-selected="false">Play Tecmo</button>
           <button type="button" role="tab" data-lt="admin" aria-selected="false" hidden id="lk-admin-tab">Commissioner</button>
         </div>
         <p class="msg" id="lk-msg" role="status"></p>
@@ -1023,6 +1031,22 @@ html,body{overflow-x:clip}
           <div id="people-list" class="lk-people"></div>
         </div>
 
+        <div class="lk-pane" data-pane="tecmo" hidden>
+          <div class="tecmo-hero">
+            <div>
+              <h3 class="lk-h3">Tecmo Super Bowl</h3>
+              <p class="lk-hint" id="tecmo-status">Checking for the league ROM…</p>
+            </div>
+            <a class="submit tecmo-play" id="tecmo-play" href="tecmo/" hidden>Play now <span aria-hidden="true">▶</span></a>
+          </div>
+          <div class="tecmo-how">
+            <div><h4>Phone &amp; tablet</h4><p class="lk-hint">On-screen D-pad, A, B, Start and Select show up automatically. Turn your phone sideways for the biggest picture.</p></div>
+            <div><h4>Keyboard</h4><p class="lk-hint">Arrows or WASD to move · <b>X</b> = A · <b>Z</b> = B · <b>Enter</b> = Start · <b>Shift</b> = Select. Player 2: IJKL · <b>.</b> = A · <b>,</b> = B.</p></div>
+            <div><h4>Controller</h4><p class="lk-hint">Xbox, PlayStation and 8BitDo controllers work over Bluetooth or USB. The second controller is Player 2.</p></div>
+            <div><h4>Saves</h4><p class="lk-hint">Season progress saves automatically in your browser on this device. Use Save and Load for a quick snapshot.</p></div>
+          </div>
+        </div>
+
         <div class="lk-pane" data-pane="admin" hidden>
           <h3 class="lk-h3">On Air</h3>
           <form class="sheet lk-form" id="bc-form" novalidate>
@@ -1044,6 +1068,12 @@ html,body{overflow-x:clip}
             </div>
             <div class="lk-row"><span class="lk-hint" id="mw-state">No matchup set.</span><span class="lk-row"><button type="button" class="btn" id="mw-toggle" hidden>Close voting</button><button type="submit" class="submit">Start new vote</button></span></div>
           </form>
+          <h3 class="lk-h3">Tecmo Super Bowl ROM</h3>
+          <form class="lk-row tecmo-up" id="tecmo-form" novalidate>
+            <span class="lk-hint" id="tecmo-adm-state">Checking…</span>
+            <span class="lk-row"><label class="sr" for="tecmo-file">League ROM (.nes)</label><input type="file" id="tecmo-file" accept=".nes"><button type="submit" class="submit">Upload ROM</button><button type="button" class="btn danger" id="tecmo-del" hidden>Remove</button></span>
+          </form>
+          <p class="lk-hint">Approved members play it from <b>Play Tecmo</b>. Only signed-in, approved members can download the ROM. Uploading a new build replaces the old one, and saved seasons start fresh on the new build.</p>
           <h3 class="lk-h3">Coach profiles to confirm</h3>
           <div id="adm-claims" class="lk-list"></div>
           <h3 class="lk-h3">League sign-ups</h3>
@@ -1852,7 +1882,7 @@ function openTab(t){
   LK.tab=t; lkMsg('');
   document.querySelectorAll('[data-lt]').forEach(b=>b.setAttribute('aria-selected',b.dataset.lt===t));
   document.querySelectorAll('.lk-pane').forEach(p=>p.hidden=p.dataset.pane!==t);
-  ({news:loadNews,board:loadBoard,games:loadGames,clips:loadMyClips,people:loadPeople,admin:loadAdmin})[t]();
+  ({news:loadNews,board:loadBoard,games:loadGames,clips:loadMyClips,people:loadPeople,tecmo:loadTecmo,admin:loadAdmin})[t]();
 }
 document.querySelectorAll('[data-lt]').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.lt)));
 const wrapErr=fn=>async(...a)=>{try{await fn(...a);}catch(e){lkMsg(e.message,'err');}};
@@ -1952,10 +1982,42 @@ const loadPeople=wrapErr(async()=>{
 
 // Commissioner tools
 const teamOptions=sel=>'<option value="">No team</option>'+[...TEAMS].sort((a,b)=>a.full.localeCompare(b.full)).map(t=>`<option value="${t.ab}"${t.ab===sel?' selected':''}>${t.full}</option>`).join('');
+// Tecmo Super Bowl: the player lives in tecmo/ and downloads the ROM with the Locker Room sign-in.
+const kb=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.round(n/1024)+' KB';
+const loadTecmo=wrapErr(async()=>{
+  const {rom}=await api('/api/tecmo/info');
+  $('tecmo-play').hidden=!rom;
+  $('tecmo-status').textContent=rom?`League build: ${rom.name} · updated ${ago(rom.updated)}. Plays right in your browser on phone, tablet or computer.`:'The commissioner hasn’t uploaded the league ROM yet. Check back soon.';
+});
+async function loadAdminTecmo(){
+  try{
+    const {rom}=await api('/api/tecmo/info');
+    $('tecmo-adm-state').innerHTML=rom?`<b>${esc(rom.name)}</b> · ${kb(rom.size)} · uploaded ${ago(rom.updated)}${rom.uploadedBy?' by '+esc(rom.uploadedBy):''}`:'No ROM uploaded yet.';
+    $('tecmo-del').hidden=!rom;
+  }catch(e){$('tecmo-adm-state').textContent=e.message;}
+}
+$('tecmo-form').addEventListener('submit',wrapErr(async e=>{
+  e.preventDefault();
+  const f=$('tecmo-file').files[0];
+  if(!f){lkMsg('Choose the league .nes file first.','err');return;}
+  if(f.size>1048576){lkMsg('That file is too big for a Tecmo ROM (1 MB max).','err');return;}
+  lkMsg('Uploading '+f.name+'…');
+  const headers={'content-type':'application/octet-stream'}; const t=tokGet(); if(t) headers.authorization='Bearer '+t;
+  let res; try{res=await fetch(API_BASE.replace(/\/$/,'')+'/api/tecmo/rom?name='+encodeURIComponent(f.name),{method:'POST',headers,body:await f.arrayBuffer()});}
+  catch(_){throw new Error('The league server can’t be reached. Check your connection and try again.');}
+  let d={}; try{d=await res.json();}catch(_){}
+  if(!res.ok) throw new Error(d.error||'Upload failed. Please try again.');
+  $('tecmo-file').value=''; lkMsg('ROM uploaded. Members can play it now.','ok'); loadAdminTecmo();
+}));
+$('tecmo-del').addEventListener('click',wrapErr(async()=>{
+  if(!confirm('Remove the league ROM? Members won’t be able to play until you upload one again.')) return;
+  await api('/api/tecmo/rom',{method:'DELETE'}); lkMsg('ROM removed.','ok'); loadAdminTecmo();
+}));
+
 const loadAdmin=wrapErr(async()=>{
   const {members,invites}=await api('/api/admin/members');
   const pend=members.filter(m=>m.status==='pending'&&!m.fan);
-  loadAdminFan(); loadAdminClaims();
+  loadAdminFan(); loadAdminClaims(); loadAdminTecmo();
   const noteam=members.filter(m=>m.status==='approved'&&!m.teams.length);
   $('adm-noteam').innerHTML=noteam.length?noteam.map(m=>`<div class="lk-person row">${avatarHtml(m,40)}<span><b>${esc(m.display)}</b><span class="lk-meta">@${esc(m.username)}</span></span>
     <label class="sr" for="nt-${m.id}">Team</label><select id="nt-${m.id}" data-team="${m.id}">${teamOptions('')}</select></div>`).join(''):'<p class="none">Every member has a team.</p>';
