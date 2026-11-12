@@ -649,7 +649,11 @@ async function handleSignupApi(request, env, route, me, ok, err, ctx) {
   if (route[0] === "signups" && route[1] === "board" && M === "GET") {
     const r = await db.prepare(`SELECT member_id, team, coach, status FROM signups WHERE status IN ('pending','approved')`).all();
     const mine = me ? await db.prepare(`SELECT * FROM signups WHERE member_id = ?1`).bind(me.id).first() : null;
+    // Teams already linked to an approved member (confirmed coaches). Reserved teams not in this list can still be claimed.
+    const heldRows = await db.prepare(`SELECT teams FROM members WHERE status = 'approved' AND teams IS NOT NULL AND teams != ''`).all();
+    const held = [...new Set(heldRows.results.flatMap((x) => String(x.teams || "").split(",").filter(Boolean)))];
     return ok({
+      held,
       claims: r.results.map((x) => ({ team: x.team, coach: x.coach, status: x.status, mine: !!me && x.member_id === me.id })),
       me: me && me.status !== "removed" ? { display: me.display || me.username, avatar: me.avatar, admin: isAdmin } : null,
       mine: mine && mine.status !== "declined" ? publicSignup(mine) : null,

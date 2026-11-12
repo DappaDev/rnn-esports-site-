@@ -385,7 +385,18 @@ footer img{width:28px;height:28px}
 .tile.taken .st{background:rgba(13,24,36,.85);color:var(--ice-dim)}
 .tile.req{cursor:not-allowed;filter:saturate(.6) brightness(.8)}
 .tile.req .st{background:var(--sky);color:var(--navy-900)}
-.divs.open-only .tile.taken,.divs.open-only .tile.req{display:none}
+.divs.open-only .tile.taken,.divs.open-only .tile.req,.divs.open-only .tile.res{display:none}
+.divs.res-only .tile:not(.res){display:none}
+.divs.res-only li:has(.tile:not(.res)){display:none}
+.divs.open-only li:has(.tile.taken),.divs.open-only li:has(.tile.req),.divs.open-only li:has(.tile.res){display:none}
+.tile.res{box-shadow:inset 0 0 0 3px var(--neon)}
+.tile.res:hover{transform:translateX(3px)}
+.tile.res[aria-pressed="true"]{outline:3px solid var(--neon);outline-offset:2px}
+.tile.res .st{background:var(--neon);color:var(--navy-900)}
+.meter-bar .m-res{background:var(--neon)}
+.res-note{margin:0;padding:10px 12px;border:2px solid var(--neon);border-radius:4px;font-family:var(--f-cond);font-size:15px;line-height:1.35}
+.res-tag{display:inline-block;margin-top:4px;padding:1px 6px;border-radius:2px;background:var(--neon);color:var(--navy-900);font-family:var(--f-cond);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.res-tag.warn{background:#ff6b6b;color:#fff}
 
 .signup{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:32px;align-items:start}
 @media (max-width:900px){.signup{grid-template-columns:1fr}}
@@ -1258,16 +1269,17 @@ html,body{overflow-x:clip}
       <div>
         <div class="eyebrow"><span class="stars">★★★</span> RNN Madden 27 League · Season one</div>
         <h1>Take a seat<br>at the <span class="tag">table.</span></h1>
-        <p class="lede">We're filling all 32 franchises. Pick an open team, build your coach card, and get on the RNN broadcast schedule.</p>
+        <p class="lede">We're filling all 32 franchises. Pick an open team, build your coach card, and get on the RNN broadcast schedule. Already one of our coaches? Your team is reserved for you on the board. Sign in and claim it.</p>
         <div class="lk-row" style="justify-content:flex-start;gap:16px"><a class="cta" href="#signup">Start my sign-up <span aria-hidden="true">↓</span></a><a class="cta ghost" data-discord-link hidden target="_blank" rel="noopener" href="#">Join the RNN Discord</a></div>
       </div>
       <div>
         <div class="seats" id="seats">18</div>
         <div class="seats-label">Teams still open</div>
         <div class="meter">
-          <div class="meter-bar" role="img" id="meter-bar" aria-label="League fill"><span class="m-taken" id="m-taken"></span><span class="m-req" id="m-req"></span></div>
+          <div class="meter-bar" role="img" id="meter-bar" aria-label="League fill"><span class="m-taken" id="m-taken"></span><span class="m-res" id="m-res"></span><span class="m-req" id="m-req"></span></div>
           <div class="meter-key">
-            <span><i style="background:var(--ice)"></i><b id="k-taken">14</b> coached</span>
+            <span><i style="background:var(--ice)"></i><b id="k-taken">0</b> coached</span>
+            <span><i style="background:var(--neon)"></i><b id="k-res">15</b> reserved</span>
             <span><i style="background:var(--sky)"></i><b id="k-req">0</b> requested</span>
             <span><i style="background:var(--navy-600)"></i><b id="k-open">18</b> open</span>
           </div>
@@ -1279,13 +1291,14 @@ html,body{overflow-x:clip}
   <section id="board">
     <div class="wrap">
       <div class="board-head">
-        <div><h2>The Draft Board</h2><p class="sub">All 32 franchises · tap an open team to claim it</p></div>
+        <div><h2>The Draft Board</h2><p class="sub">All 32 franchises · tap an open team, or the team reserved for you</p></div>
         <div class="filters" role="group" aria-label="Show teams">
-          <button type="button" data-show="open" aria-pressed="true">Open teams</button>
-          <button type="button" data-show="all" aria-pressed="false">All 32</button>
+          <button type="button" data-show="all" aria-pressed="true">All 32</button>
+          <button type="button" data-show="open" aria-pressed="false">Open teams</button>
+          <button type="button" data-show="res" aria-pressed="false">Reserved</button>
         </div>
       </div>
-      <div class="divs open-only" id="divs"></div>
+      <div class="divs" id="divs"></div>
     </div>
   </section>
 
@@ -1305,6 +1318,7 @@ html,body{overflow-x:clip}
           </div>
           <form class="sheet" id="sheet" novalidate>
             <div class="pick-line" aria-live="polite"><span class="sub" style="margin:0">Your team</span> <b id="pick-name">None picked yet</b> <a href="#board" id="pick-change" style="font-size:15px">Pick from the board</a></div>
+            <p class="res-note" id="res-note" hidden></p>
             <div class="row2">
               <div class="fld"><label for="f-coach">Coach name</label><input id="f-coach" maxlength="28" autocomplete="nickname" placeholder="How the broadcast calls you" required></div>
               <div class="fld"><label for="f-console">Console</label>
@@ -1476,39 +1490,44 @@ const TEAM=Object.fromEntries(TEAMS.map(t=>[t.ab,t]));
 const COACHED={};
 COACHES.forEach(c=>{const t=TEAMS.find(t=>t.full===c.team); if(t)(COACHED[t.ab]=COACHED[t.ab]||[]).push(c.name);});
 
-const J={inited:false,db:null,user:null,me:null,claims:{},myClaim:null,mySignup:null,pick:null,editing:false,isAdmin:false};
+const J={inited:false,db:null,user:null,me:null,claims:{},myClaim:null,mySignup:null,pick:null,editing:false,isAdmin:false,held:new Set()};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function requestedBy(ab){ // claim docs from other people
   return Object.entries(J.claims).filter(([uid,c])=>c.team===ab&&uid!==J.me);
 }
+// Teams on the coach roster are reserved for that coach until they sign in, claim it and the commissioner confirms.
 function teamState(ab){
-  if(COACHED[ab]) return 'taken';
   const o=requestedBy(ab);
-  if(o.some(([,c])=>c.status==='approved')) return 'taken';
+  if(J.held.has(ab)||o.some(([,c])=>c.status==='approved')) return 'taken';
   if(o.length) return 'req';
+  if(COACHED[ab]) return 'res';
   return 'open';
 }
-const coachNames=ab=>COACHED[ab]||requestedBy(ab).filter(([,c])=>c.status==='approved').map(([,c])=>c.coach);
+const pickable=ab=>{const s=teamState(ab); return s==='open'||s==='res'||!!(J.myClaim&&J.myClaim.team===ab&&s!=='taken');};
+const coachNames=ab=>{const a=requestedBy(ab).filter(([,c])=>c.status==='approved').map(([,c])=>c.coach); return a.length?a:(COACHED[ab]||[]);};
+const reservedFor=ab=>(COACHED[ab]||[]).join(' & ');
 function renderBoard(){
   const groups={};
   TEAMS.forEach(t=>{(groups[t.conf+' '+t.div]=groups[t.conf+' '+t.div]||[]).push(t);});
   $('divs').innerHTML=Object.entries(groups).map(([g,ts])=>`
     <div class="div"><h3>${g}</h3><ul>${ts.map(t=>{
-      const s=teamState(t.ab), mine=J.myClaim&&J.myClaim.team===t.ab;
-      const sub=s==='taken'?'Coach '+coachNames(t.ab).join(' & '):s==='req'?'Request pending':mine?'Your request':'Open seat';
-      const badge=s==='taken'?'Coached':s==='req'?'Requested':mine?'Yours':'Open';
-      return `<li><button type="button" class="tile ${s}" style="--c1:${t.c1};--c2:${t.c2}" data-ab="${t.ab}" ${s!=='open'?'aria-disabled="true"':''} aria-pressed="${J.pick===t.ab}" aria-label="${t.full}, ${sub}">
+      const s=teamState(t.ab), mine=J.myClaim&&J.myClaim.team===t.ab&&s!=='taken';
+      const sub=s==='taken'?'Coach '+coachNames(t.ab).join(' & '):s==='req'?(COACHED[t.ab]?'Claim waiting for commissioner':'Request pending'):mine?(COACHED[t.ab]?'Your claim · waiting to confirm':'Your request'):s==='res'?'Reserved for '+reservedFor(t.ab):'Open seat';
+      const badge=s==='taken'?'Coached':s==='req'?'Requested':mine?'Yours':s==='res'?'Reserved':'Open';
+      return `<li><button type="button" class="tile ${s}" style="--c1:${t.c1};--c2:${t.c2}" data-ab="${t.ab}" ${!pickable(t.ab)?'aria-disabled="true"':''} aria-pressed="${J.pick===t.ab}" aria-label="${t.full}, ${esc(sub)}">
         <span class="ab">${t.ab}</span><span><span class="tn">${t.name}</span><br><span class="ts">${esc(sub)}</span></span><span class="st">${badge}</span></button></li>`;
     }).join('')}</ul></div>`).join('');
   // counts
   const taken=TEAMS.filter(t=>teamState(t.ab)==='taken'||(J.myClaim&&J.myClaim.team===t.ab&&J.myClaim.status==='approved')).length;
   const req=TEAMS.filter(t=>teamState(t.ab)!=='taken'&&Object.values(J.claims).some(c=>c.team===t.ab&&c.status!=='approved')).length;
-  const open=32-taken-req;
-  $('seats').textContent=open; $('k-taken').textContent=taken; $('k-req').textContent=req; $('k-open').textContent=open;
-  $('m-taken').style.width=(taken/32*100)+'%'; $('m-req').style.width=(req/32*100)+'%';
-  $('meter-bar').setAttribute('aria-label',`${taken} coached, ${req} requested, ${open} open of 32`);
+  const res=TEAMS.filter(t=>teamState(t.ab)==='res'&&!(J.myClaim&&J.myClaim.team===t.ab)).length;
+  const open=32-taken-req-res;
+  $('seats').textContent=open; $('k-taken').textContent=taken; $('k-res').textContent=res; $('k-req').textContent=req; $('k-open').textContent=open;
+  $('m-taken').style.width=(taken/32*100)+'%'; $('m-res').style.width=(res/32*100)+'%'; $('m-req').style.width=(req/32*100)+'%';
+  $('meter-bar').setAttribute('aria-label',`${taken} coached, ${res} reserved, ${req} requested, ${open} open of 32`);
+  syncReserved();
 }
 function setPick(ab){
   J.pick=ab; const t=TEAM[ab];
@@ -1517,7 +1536,22 @@ function setPick(ab){
   const p=$('pcard');
   p.style.setProperty('--c1',t?t.c1:'#1b2c3c'); p.style.setProperty('--c2',t?t.c2:'#8fc1e3');
   $('p-ab').textContent=t?t.ab:'RNN'; $('p-tm').textContent=t?t.name:'Pick a team';
+  // Picking your reserved team fills in your coach name
+  if(t&&COACHED[ab]&&!$('f-coach').value.trim()&&COACHED[ab].length===1){$('f-coach').value=COACHED[ab][0]; $('p-nm').textContent=COACHED[ab][0];}
   renderBoard();
+}
+function submitLabel(){
+  if(J.editing) return 'Save changes';
+  const r=J.pick&&COACHED[J.pick];
+  if(API_BASE&&!J.meLeague) return r?'Sign in with Discord & claim my reserved team':'Sign in with Discord & claim';
+  return r?'Claim my reserved team':'Claim my team';
+}
+function syncReserved(){
+  const n=$('res-note'); if(!n) return;
+  const ab=J.pick, who=ab&&reservedFor(ab);
+  n.hidden=!who;
+  if(who) n.textContent=`The ${TEAM[ab].full} are reserved for ${who}. If that’s you, send this to claim your team. The commissioner confirms every claim before you get the team in the Locker Room. Not ${who}? Pick an open team instead.`;
+  const b=$('f-submit'); if(b&&!b.disabled) b.textContent=submitLabel();
 }
 $('divs').addEventListener('click',e=>{
   const b=e.target.closest('.tile'); if(!b||b.getAttribute('aria-disabled')==='true') return;
@@ -1527,6 +1561,7 @@ $('divs').addEventListener('click',e=>{
 document.querySelectorAll('[data-show]').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('[data-show]').forEach(x=>x.setAttribute('aria-pressed',x===b));
   $('divs').classList.toggle('open-only',b.dataset.show==='open');
+  $('divs').classList.toggle('res-only',b.dataset.show==='res');
 }));
 $('f-coach').addEventListener('input',e=>{$('p-nm').textContent=e.target.value.trim()||'Coach Name';});
 
@@ -1565,7 +1600,7 @@ $('withdraw-yes').addEventListener('click',async()=>{
     if(API_BASE) await api('/api/signups/mine',{method:'DELETE'});
     else {await J.db.doc('claims/'+J.me).delete(); await J.db.doc('signups/'+J.me).delete();}
     J.mySignup=null; J.myClaim=null; J.editing=false; $('withdraw-confirm').hidden=true;
-    $('sheet').reset(); setPick(null); $('p-nm').textContent='Coach Name'; $('f-submit').textContent='Claim my team';
+    $('sheet').reset(); setPick(null); $('p-nm').textContent='Coach Name'; $('f-submit').textContent=submitLabel();
     showMine(); msg('Your request was withdrawn. The team is open again.','ok');
     if(API_BASE) loadJoinBoard();
   }catch(e){msg(API_BASE&&e.message?e.message:"Couldn't withdraw right now. Check your connection and try again.",'err');}
@@ -1622,21 +1657,20 @@ function readForm(){return {team:J.pick,coach:$('f-coach').value.trim(),console:
 function renderWho(){
   const w=$('f-who'); if(!API_BASE){w.hidden=true;return;}
   w.hidden=false;
-  if(J.meLeague){w.innerHTML=`Signed in with Discord as <b>${esc(J.meLeague.display)}</b><button type="button" id="f-signout">Not you?</button>`;
-    $('f-submit').textContent=J.editing?'Save changes':'Claim my team';}
-  else{w.textContent='You’ll sign in with Discord when you send this, so the commissioner knows who you are.';
-    $('f-submit').textContent='Sign in with Discord & claim';}
+  if(J.meLeague){w.innerHTML=`Signed in with Discord as <b>${esc(J.meLeague.display)}</b><button type="button" id="f-signout">Not you?</button>`;}
+  else{w.textContent='You’ll sign in with Discord when you send this, so the commissioner knows who you are.';}
+  $('f-submit').textContent=submitLabel();
 }
 $('f-who').addEventListener('click',async e=>{ if(!e.target.closest('#f-signout')) return;
   try{await api('/api/logout',{method:'POST'});}catch(_){} tokSet(null); LK.me=null; J.meLeague=null; J.mySignup=null; J.myClaim=null; J.editing=false; showMine(); loadJoinBoard(); });
 async function loadJoinBoard(){
   try{
     const d=await api('/api/signups/board');
-    J.me='me'; J.meLeague=d.me; J.claims={};
+    J.me='me'; J.meLeague=d.me; J.claims={}; J.held=new Set(d.held||[]);
     d.claims.forEach((c,i)=>{J.claims[c.mine?'me':'c'+i]={team:c.team,coach:c.coach,status:c.status};});
     J.myClaim=J.claims.me||null; J.mySignup=fromLeague(d.mine);
     if(J.mySignup&&!J.editing){setPick(J.mySignup.team);}
-    else if(J.pick&&teamState(J.pick)!=='open'&&!(J.myClaim&&J.myClaim.team===J.pick)) setPick(null); else renderBoard();
+    else if(J.pick&&!pickable(J.pick)) setPick(null); else renderBoard();
     showMine(); renderWho();
     if(d.declined&&!J.mySignup) msg(`Your request for the ${TEAM[d.declined]?.name||d.declined} wasn’t approved this time. You can pick another open team.`,'err');
     if(d.me&&d.me.admin) loadSignupsAdmin();
@@ -1645,7 +1679,7 @@ async function loadJoinBoard(){
 async function submitToLeague(){
   const f=readForm();
   if(!f.team){msg('Pick an open team from the draft board first.','err');document.getElementById('board').scrollIntoView();return;}
-  if(teamState(f.team)!=='open'&&!(J.myClaim&&J.myClaim.team===f.team)){msg(`The ${TEAM[f.team].name} were just requested by someone else. Pick another open team.`,'err');return;}
+  if(!pickable(f.team)){msg(`The ${TEAM[f.team].name} were just requested by someone else. Pick another open team.`,'err');return;}
   if(!f.coach){msg('Add the coach name the broadcast should use.','err');$('f-coach').focus();return;}
   if(!f.psn){msg(f.console==='Xbox'?'Add your Xbox Gamertag so we can send game invites.':'Add your PSN ID so we can send game invites.','err');$('f-psn').focus();return;}
   if(!f.contact){msg('Add an email or phone number so the commissioner can confirm your seat.','err');$('f-contact').focus();return;}
@@ -1667,7 +1701,7 @@ async function loadSignupsAdmin(){
     const {signups}=await api('/api/admin/signups');
     $('admin').hidden=false;
     $('admin-rows').innerHTML=signups.length?signups.map(r=>`<tr>
-      <td><b>${esc(r.coach)}</b><br><span class="lk-meta">@${esc(r.username||'')}</span></td><td>${esc(TEAM[r.team]?.full||r.team)}</td><td><b>${esc(r.console||'PS5')}</b> · ${esc(r.gamerId)}</td><td style="user-select:all">${esc(r.contact)}</td>
+      <td><b>${esc(r.coach)}</b><br><span class="lk-meta">@${esc(r.username||'')}</span></td><td>${esc(TEAM[r.team]?.full||r.team)}${COACHED[r.team]?`<br><span class="res-tag${COACHED[r.team].some(n=>n.toLowerCase()===String(r.coach||'').trim().toLowerCase())?'':' warn'}">Reserved for ${esc(reservedFor(r.team))}</span>`:''}</td><td><b>${esc(r.console||'PS5')}</b> · ${esc(r.gamerId)}</td><td style="user-select:all">${esc(r.contact)}</td>
       <td>${esc(r.exp)}</td><td>${esc((r.days||[]).join(', '))}</td><td>${esc(r.note)}</td><td>${r.created?new Date(r.created).toLocaleDateString():''}</td>
       <td><span class="su-st ${esc(r.status)}">${r.status==='approved'?'Approved':r.status==='declined'?'Declined':'Waiting'}</span></td>
       <td>${r.status==='pending'?`<button type="button" class="btn ok" data-su-ok="${esc(r.id)}">Approve</button><button type="button" class="btn danger" data-su-no="${esc(r.id)}">Decline</button>`:''}<button type="button" class="btn danger" data-su-del="${esc(r.id)}">Remove</button></td></tr>`).join('')
