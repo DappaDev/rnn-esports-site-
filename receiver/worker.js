@@ -340,7 +340,8 @@ async function handleAuth(request, env, url, segs, ctx) {
     const state = randomToken(16);
     await db.prepare(`DELETE FROM oauth_states WHERE created < ?1`).bind(Date.now() - 600000).run();
     await db.prepare(`INSERT INTO oauth_states (state, created, purpose) VALUES (?1, ?2, ?3)`).bind(state, Date.now(), ["fan", "join"].includes(url.searchParams.get("for")) ? "fan" : null).run();
-    const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, redirect_uri: redirectUri, response_type: "code", scope: env.DISCORD_GUILD_ID ? "identify guilds.members.read" : "identify", state, prompt: "none" });
+    const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, redirect_uri: redirectUri, response_type: "code", scope: env.DISCORD_GUILD_ID ? "identify guilds.members.read" : "identify", state });
+    // No prompt=none: with it, Discord's in-app browser on phones can hang on a blank page.
     return Response.redirect("https://discord.com/oauth2/authorize?" + q, 302);
   }
 

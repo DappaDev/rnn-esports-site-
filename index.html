@@ -1020,6 +1020,7 @@ html,body{overflow-x:clip}
         <p id="lk-out-text">Use your Discord account. The first time, the commissioner approves you before you can get in.</p>
         <a class="cta cta-neon" id="lk-signin" href="#locker">Sign in with Discord</a>
         <p class="msg" id="lk-out-msg" role="status"></p>
+        <p class="lk-hint signin-help">Stuck on a blank page after tapping sign in? You probably opened the site from inside the Discord app. Open <b>dappadev.github.io/rnn-esports-site-</b> in Safari or Chrome instead (tap ••• or the share button → Open in browser), then sign in again.</p>
       </div>
       <div class="lk-card" id="lk-pending" hidden>
         <h2>You're on the list</h2>
@@ -1658,7 +1659,7 @@ function renderWho(){
   const w=$('f-who'); if(!API_BASE){w.hidden=true;return;}
   w.hidden=false;
   if(J.meLeague){w.innerHTML=`Signed in with Discord as <b>${esc(J.meLeague.display)}</b><button type="button" id="f-signout">Not you?</button>`;}
-  else{w.textContent='You’ll sign in with Discord when you send this, so the commissioner knows who you are.';}
+  else{w.textContent='You’ll sign in with Discord when you send this, so the commissioner knows who you are. On a phone, open this page in Safari or Chrome, not inside the Discord app.';}
   $('f-submit').textContent=submitLabel();
 }
 $('f-who').addEventListener('click',async e=>{ if(!e.target.closest('#f-signout')) return;
